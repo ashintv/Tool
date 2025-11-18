@@ -6,31 +6,28 @@ import (
 	"github.com/docker/docker/client"
 )
 
-type imageService struct {
-	Name string
+type ImageService struct {
 	ctx context.Context
 	cli *client.Client
 }
 
-func NewImageService(name string, ctx context.Context, cli *client.Client) *imageService {
-	return &imageService{
-		Name: name,
+func NewImageService(ctx context.Context, cli *client.Client) *ImageService {
+	return &ImageService{
 		ctx:  ctx,
 		cli:  cli,
 	}
 }
 
-func (I *imageService) PullImage(){
+func (I *ImageService) PullImage(imageName string){
 
 }
-func (I *imageService) RemoveImage(){
+func (I *ImageService) RemoveImage(imageName string){
 }
 
-func ListImages(){
+func (I *ImageService) ListImages(){
 
 }
 
-func FindImage(){
-
+func (I *ImageService) FindImage(imageName string){
 }
 
