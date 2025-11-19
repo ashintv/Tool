@@ -109,20 +109,26 @@ func main() {
 			fmt.Print(example_usage)
 			continue
 		}
-
-
-
 	}
 }
 
 func handlePullImage(imageService *services.ImageService, imageName string) {
 	fmt.Printf("Pulling image: %s\n", imageName)
-	imageService.PullImage(imageName)
+	err := imageService.PullImage(imageName)
+	if err != nil {
+		fmt.Printf("Error pulling image: %v\n", err)
+		return
+	}
+	fmt.Println("Image pulled successfully")
 }
 
 func handleRemoveImage(imageService *services.ImageService, imageName string) {
 	fmt.Printf("Removing image: %s\n", imageName)
-	imageService.RemoveImage(imageName)
+	err := imageService.RemoveImage(imageName)
+	if err != nil {
+		fmt.Printf("Error removing image: %v\n", err)
+	}
+	
 }
 
 func handleListImages(imageService *services.ImageService) {
