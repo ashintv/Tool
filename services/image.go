@@ -41,14 +41,38 @@ func (I *ImageService) RemoveImage(imageName string) error {
 	return nil
 }
 
-func (I *ImageService) ListImages() error {
+func (I *ImageService) ListImages(level int) error {
 	images, err := I.cli.ImageList(I.ctx, image.ListOptions{})
 	if err != nil {
 		fmt.Println("Error listing images", err)
 		return err
 	}
 	for i, img := range images {
-		fmt.Println(i+1, " : Image ID:", img.ID)
+		switch level {
+		case 2:
+			// level2 just tag and 1 more data
+			fmt.Println("Image: ", i+1)
+			fmt.Println("RepoTag: ", img.RepoTags )
+			fmt.Println("Label :", img.Labels)
+			continue
+		case 3:
+			// itetrate a pretty print all data
+			fmt.Printf("%d Image: %s ",i+1, img.RepoTags)
+			fmt.Printf("Containers  %+v\n", img.Containers)
+			fmt.Printf("Created %+v\n", img.Created)
+			fmt.Printf("ID %+v\n", img.ID)
+			fmt.Printf("Labels %+v\n", img.Labels)
+			fmt.Printf("RepoDigests %+v\n", img.RepoDigests)
+			fmt.Printf("SharedSize %+v\n", img.SharedSize)
+			fmt.Printf("Size %+v\n", img.Size)
+			fmt.Printf("\n\n")
+			continue
+		default:
+			fmt.Println(i+1, " : Image - ", img.RepoTags)
+		}
+		fmt.Println()
+		fmt.Println("--------------------------------------------------")
+
 	}
 	return nil
 }

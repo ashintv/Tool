@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,18 +27,25 @@ const (
 	MONITOR_CONTAINER = "monitor"
 )
 
+// command image_name or command -options
+// example pull mongodb:latest
+// example Ilist -2
 const example_usage string = `The following commands are available:
-pull:<image-name>          - Pull a Docker image
-Iremove:<image-name>      - Remove a Docker image
-Ilist                     - List all Docker images
-Ifind:<image-name>        - Find a specific Docker image \n
-start:<container-name>    - Start a Docker container
-stop:<container-name>     - Stop a Docker container
-Cremove:<container-name>  - Remove a Docker container
-Clist                     - List all Docker containers
-Cfind:<container-name>    - Find a specific Docker container
-monitor:<container-name>  - Monitor a Docker container
+pull <image-name>          - Pull a Docker image
+Iremove <image-name>      - Remove a Docker image
+Ilist -<level>            - List all Docker images
+Ifind <image-name>        - Find a specific Docker image \n
+start <container-name>    - Start a Docker container
+stop <container-name>     - Stop a Docker container
+Cremove <container-name>  - Remove a Docker container
+Clist   -<level>            - List all Docker containers
+Cfind <container-name>    - Find a specific Docker container
+monitor <container-name>  - Monitor a Docker container
 `
+
+const (
+	PLACEHOLDER = "<xyz>"
+)
 
 func main() {
 	reader := bufio.NewReader(os.Stdin)
@@ -67,24 +75,33 @@ func main() {
 		input, _ := reader.ReadString('\n')
 		input = strings.TrimSpace(input)
 		// Handle commands command look like  pull:image-name
-		parts := strings.Split(input, ":")
+		// TODO: repalce with a better command parser
+		parts := strings.Split(input, " ")
 		if len(parts) < 1 {
+			// add empty input handling can ignore la
 			fmt.Println("Invalid command")
 			fmt.Print(example_usage)
 			continue
 		}
-		switch parts[0] {
+
+		// Ensure parts has at least 2 elements for commands without parameters error free handling
+		if len(parts) < 2 {
+			parts = append(parts, PLACEHOLDER)
+		}
+		command := parts[0]
+		Options := parts[1]
+		switch command {
 		case PULL_IMAGE:
-			handlePullImage(imageService, parts[1])
+			handlePullImage(imageService, Options)
 			continue
 		case REMOVE_IMAGE:
-			handleRemoveImage(imageService, parts[1])
+			handleRemoveImage(imageService, Options)
 			continue
 		case LIST_IMAGES:
-			handleListImages(imageService)
+			handleListImages(imageService, Options)
 			continue
 		case FIND_IMAGE:
-			handleFindImage(imageService, parts[1])
+			handleFindImage(imageService, Options)
 			continue
 		case START_CONTAINER:
 			handleStartContainer(containerService)
@@ -113,6 +130,10 @@ func main() {
 }
 
 func handlePullImage(imageService *services.ImageService, imageName string) {
+	if imageName == PLACEHOLDER {
+		fmt.Println("Please provide an image name to pull.")
+		return
+	}
 	fmt.Printf("Pulling image: %s\n", imageName)
 	err := imageService.PullImage(imageName)
 	if err != nil {
@@ -123,20 +144,39 @@ func handlePullImage(imageService *services.ImageService, imageName string) {
 }
 
 func handleRemoveImage(imageService *services.ImageService, imageName string) {
+	if imageName == PLACEHOLDER {
+		fmt.Println("Please provide an image name to pull.")
+		return
+	}
 	fmt.Printf("Removing image: %s\n", imageName)
 	err := imageService.RemoveImage(imageName)
 	if err != nil {
 		fmt.Printf("Error removing image: %v\n", err)
 	}
-	
+
 }
 
-func handleListImages(imageService *services.ImageService) {
+// TODO: add addiions options to print (differtent l- list images , detailed list etc)
+func handleListImages(imageService *services.ImageService, Options string) {
+	fmt.Println("Listing images with options:", Options)
+	if Options == PLACEHOLDER {
+		Options = "-1"
+	}
 	fmt.Println("Listing images:")
-	imageService.ListImages()
+	opt := Options[1:]
+	level, err := strconv.Atoi(opt)
+	if err != nil {
+		fmt.Println("Invalid level option, defaulting to level 1")
+		level = 1
+	}
+	imageService.ListImages(level)
 }
 
 func handleFindImage(imageService *services.ImageService, imageName string) {
+	if imageName == PLACEHOLDER {
+		fmt.Println("Please provide an image name to pull.")
+		return
+	}
 	fmt.Println("Finding image:")
 	imageService.FindImage(imageName)
 }
