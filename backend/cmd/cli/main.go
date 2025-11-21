@@ -104,7 +104,7 @@ func main() {
 			handleFindImage(ctx, imageService, Options)
 			continue
 		case START_CONTAINER:
-			handleStartContainer(ctx, containerService)
+			handleStartContainer(ctx, containerService , Options)
 			continue
 		case STOP_CONTAINER:
 			// Implement stop container
@@ -113,8 +113,9 @@ func main() {
 			// Implement remove container
 			continue
 		case LIST_CONTAINERS:
-			// Implement list containers
+			handleListContainers(ctx , containerService)
 			continue
+			// Implement list containers
 		case FIND_CONTAINER:
 			// Implement find container
 			continue
@@ -181,7 +182,16 @@ func handleFindImage(ctx context.Context, 	imageService *services.ImageService, 
 	imageService.FindImage(ctx, imageName)
 }
 
-func handleStartContainer(ctx context.Context, containerService *services.ContainerService) {
+func handleStartContainer(ctx context.Context, containerService *services.ContainerService , containerName string) {
 	fmt.Println("Starting container:")
-	containerService.StartContainer(ctx)
+	containerService.StartContainer(ctx , containerName)
 }
+
+
+func handleListContainers(ctx context.Context, containerService *services.ContainerService) {
+	fmt.Println("Listing containers:")
+	containerService.ListContainers(ctx)
+
+}
+
+func handleFindContainer(ctx context.Context){}
