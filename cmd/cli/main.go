@@ -55,9 +55,8 @@ func main() {
 		panic(err)
 	}
 	defer Cli.Close()
-	ctx := context.Background()
-	imageService := services.NewImageService(ctx, Cli)
-	containerService := services.NewContainerService("my-container", ctx, Cli)
+	imageService := services.NewImageService(Cli)
+	containerService := services.NewContainerService(Cli)
 	emailService := services.NewEmailService("smtp.example.com", 587, "user", "pass")
 
 	// Use the services
@@ -69,6 +68,7 @@ func main() {
 
 	// when the cli starte we should check for config.json or create one with user inputs
 
+	ctx := context.Background()
 	for {
 		timt := time.Now().Format("2006-01-02 15:04:05")
 		fmt.Printf("[%s] Aetrix> ", timt)
@@ -92,19 +92,19 @@ func main() {
 		Options := parts[1]
 		switch command {
 		case PULL_IMAGE:
-			handlePullImage(imageService, Options)
+			handlePullImage(ctx, imageService, Options)
 			continue
 		case REMOVE_IMAGE:
-			handleRemoveImage(imageService, Options)
+			handleRemoveImage(ctx, imageService, Options)
 			continue
 		case LIST_IMAGES:
-			handleListImages(imageService, Options)
+			handleListImages(ctx, imageService, Options)
 			continue
 		case FIND_IMAGE:
-			handleFindImage(imageService, Options)
+			handleFindImage(ctx, imageService, Options)
 			continue
 		case START_CONTAINER:
-			handleStartContainer(containerService)
+			handleStartContainer(ctx, containerService)
 			continue
 		case STOP_CONTAINER:
 			// Implement stop container
@@ -129,13 +129,13 @@ func main() {
 	}
 }
 
-func handlePullImage(imageService *services.ImageService, imageName string) {
+func handlePullImage(ctx context.Context, imageService *services.ImageService, imageName string) {
 	if imageName == PLACEHOLDER {
 		fmt.Println("Please provide an image name to pull.")
 		return
 	}
 	fmt.Printf("Pulling image: %s\n", imageName)
-	err := imageService.PullImage(imageName)
+	err := imageService.PullImage(ctx, imageName)
 	if err != nil {
 		fmt.Printf("Error pulling image: %v\n", err)
 		return
@@ -143,13 +143,13 @@ func handlePullImage(imageService *services.ImageService, imageName string) {
 	fmt.Println("Image pulled successfully")
 }
 
-func handleRemoveImage(imageService *services.ImageService, imageName string) {
+func handleRemoveImage(ctx context.Context, imageService *services.ImageService, imageName string) {
 	if imageName == PLACEHOLDER {
 		fmt.Println("Please provide an image name to pull.")
 		return
 	}
 	fmt.Printf("Removing image: %s\n", imageName)
-	err := imageService.RemoveImage(imageName)
+	err := imageService.RemoveImage(ctx, imageName)
 	if err != nil {
 		fmt.Printf("Error removing image: %v\n", err)
 	}
@@ -157,7 +157,7 @@ func handleRemoveImage(imageService *services.ImageService, imageName string) {
 }
 
 // TODO: add addiions options to print (differtent l- list images , detailed list etc)
-func handleListImages(imageService *services.ImageService, Options string) {
+func handleListImages(ctx context.Context, imageService *services.ImageService, Options string) {
 	fmt.Println("Listing images with options:", Options)
 	if Options == PLACEHOLDER {
 		Options = "-1"
@@ -169,19 +169,19 @@ func handleListImages(imageService *services.ImageService, Options string) {
 		fmt.Println("Invalid level option, defaulting to level 1")
 		level = 1
 	}
-	imageService.ListImages(level)
+	imageService.ListImages(ctx, level)
 }
 
-func handleFindImage(imageService *services.ImageService, imageName string) {
+func handleFindImage(ctx context.Context, 	imageService *services.ImageService, imageName string) {
 	if imageName == PLACEHOLDER {
 		fmt.Println("Please provide an image name to pull.")
 		return
 	}
 	fmt.Println("Finding image:")
-	imageService.FindImage(imageName)
+	imageService.FindImage(ctx, imageName)
 }
 
-func handleStartContainer(containerService *services.ContainerService) {
+func handleStartContainer(ctx context.Context, containerService *services.ContainerService) {
 	fmt.Println("Starting container:")
-	containerService.StartContainer()
+	containerService.StartContainer(ctx)
 }

@@ -8,44 +8,32 @@ import (
 
 type ContainerService struct {
 	Name string
-	ctx  context.Context
 	cli  *client.Client
 }
 
-func NewContainerService(name string, ctx context.Context, cli *client.Client) *ContainerService {
+func NewContainerService(cli *client.Client) *ContainerService {
 	return &ContainerService{
-		Name: name,
-		ctx:  ctx,
 		cli:  cli,
 	}
 }
 
-func (c *ContainerService) StartContainer() {
-	
-}
-
-func (c *ContainerService) StopContainer() {
+func (c *ContainerService) StartContainer(ctx context.Context , ) {
 
 }
 
-func (c *ContainerService) RemoveContainer() {
+func (c *ContainerService) StopContainer(ctx context.Context) {
 
 }
 
-func ListContainers() {
+func (c *ContainerService) RemoveContainer(ctx context.Context) {
 
 }
 
-func FindContainer() {
+func ListContainers(ctx context.Context) {
 
 }
 
-
-/*
-MonitorContainer
-Monitors the status and performance of a container
-
-*/
-func MonitorContainer() {
-
+func FindContainer(ctx context.Context) {
 }
+
+
