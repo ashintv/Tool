@@ -31,12 +31,25 @@ func (c *ContainerService) ListContainers(ctx context.Context) {
 	}
 }
 
-func (c *ContainerService) StartContainer(ctx context.Context, imageName string) {
+func (c *ContainerService) StartContainerByContainerId(ctx context.Context, ContainerId string) error {
+	err := c.cli.ContainerStart(ctx,ContainerId , container.StartOptions{})
+	if err != nil {
+		fmt.Println("Error starting container", err)
+		return err
+	}
+	fmt.Println("Container started successfully with ID:", ContainerId)
+	return nil
+}
+
+// start a container by image name
+// if not image pull image ,
+// start a new one
+func (c *ContainerService) StartContainerByImage(ctx context.Context, imageName string) error {
 	resp, err := c.cli.ImagePull(ctx, imageName, image.PullOptions{})
 
 	if err != nil {
 		fmt.Println("Error pulling image", err)
-		return
+		return err
 	}
 	// log response , resp
 	defer resp.Close()
@@ -50,35 +63,37 @@ func (c *ContainerService) StartContainer(ctx context.Context, imageName string)
 	}
 
 	// check if container with c.Name
+	// this part is commend becoz whever imagename give we have to start a new container not an old one
+	// for running old one we have toCreate a new service call StartbyContainerId
 
-	conts, err := c.cli.ContainerList(ctx, container.ListOptions{All: true})
-	if err != nil {
-		fmt.Println("Error listing containers", err)
-		return
-	}
-	for _, cont := range conts {
-		for _, name := range cont.Names {
-			if name == "/"+c.Name {
-				fmt.Println("Container with name", c.Name, "already exists. Starting it.")
-				err := c.cli.ContainerStart(ctx, cont.ID, container.StartOptions{})
-				if err != nil {
-					fmt.Println("Error starting existing container", err)
-					return
-				}
-				fmt.Println("Container started successfully")
-				return
-			}
-		}
-	}
+	// conts, err := c.cli.ContainerList(ctx, container.ListOptions{All: true})
+	// if err != nil {
+	// 	fmt.Println("Error listing containers", err)
+	// 	return
+	// }
+	// for _, cont := range conts {
+	// 	for _, name := range cont.Names {
+	// 		if name == "/"+c.Name {
+	// 			fmt.Println("Container with name", c.Name, "already exists. Starting it.")
+	// 			err := c.cli.ContainerStart(ctx, cont.ID, container.StartOptions{})
+	// 			if err != nil {
+	// 				fmt.Println("Error starting existing container", err)
+	// 				return
+	// 			}
+	// 			fmt.Println("Container started successfully")
+	// 			return
+	// 		}
+	// 	}
+	// }
 	// create container
 	res, err := c.cli.ContainerCreate(ctx, &container.Config{
 		Image: imageName,
 	}, nil, nil, nil, c.Name)
 	if err != nil {
 		fmt.Println("Error creating container", err)
-		return
+		return err
 	}
-    for{
+	for {
 		n, err := resp.Read(buff)
 		if err != nil {
 			break
@@ -90,29 +105,29 @@ func (c *ContainerService) StartContainer(ctx context.Context, imageName string)
 	err = c.cli.ContainerStart(ctx, res.ID, container.StartOptions{})
 	if err != nil {
 		fmt.Println("Error starting container", err)
-		return
+		return err
 	}
 	fmt.Println("Container started successfully with ID:", res.ID)
+	return  nil
 }
 
-func (c *ContainerService) StopContainer(ctx context.Context) {
-
-}
-
-func (c *ContainerService) RemoveContainer(ctx context.Context) {
-
-}
-
-func (c *ContainerService) CreateContainer(ctx context.Context, imageName string) {
-	res, err := c.cli.ContainerCreate(ctx, &container.Config{
-		Image: imageName,
-	}, nil, nil, nil, c.Name)
-	fmt.Println("Container created successfully with ID:", res.ID)
+// Pause a conatiner without removing the process
+func (c *ContainerService) PauseContainer(ctx context.Context, ContainerId string) error {
+	err := c.cli.ContainerPause(ctx, ContainerId)
 	if err != nil {
-		fmt.Println("Error creating container", err)
-		return
+		fmt.Println("failed to Pause Container - ", err)
+		return err
 	}
+	return nil
 }
 
-func FindContainer(ctx context.Context) {
+func (c *ContainerService) RemoveContainer(ctx context.Context , ContainerId string) error {
+	err:= c.cli.ContainerRemove(ctx , ContainerId , container.RemoveOptions{})
+	if err != nil {
+		fmt.Println("failed to Pause Container - ", err)
+		return err
+	}
+	return nil
 }
+
+
