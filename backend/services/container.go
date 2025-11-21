@@ -32,7 +32,7 @@ func (c *ContainerService) ListContainers(ctx context.Context) {
 }
 
 func (c *ContainerService) StartContainerByContainerId(ctx context.Context, ContainerId string) error {
-	err := c.cli.ContainerStart(ctx,ContainerId , container.StartOptions{})
+	err := c.cli.ContainerStart(ctx, ContainerId, container.StartOptions{})
 	if err != nil {
 		fmt.Println("Error starting container", err)
 		return err
@@ -108,7 +108,7 @@ func (c *ContainerService) StartContainerByImage(ctx context.Context, imageName 
 		return err
 	}
 	fmt.Println("Container started successfully with ID:", res.ID)
-	return  nil
+	return nil
 }
 
 // Pause a conatiner without removing the process
@@ -121,13 +121,22 @@ func (c *ContainerService) PauseContainer(ctx context.Context, ContainerId strin
 	return nil
 }
 
-func (c *ContainerService) RemoveContainer(ctx context.Context , ContainerId string) error {
-	err:= c.cli.ContainerRemove(ctx , ContainerId , container.RemoveOptions{})
+// remove a container fully from the system
+func (c *ContainerService) RemoveContainer(ctx context.Context, ContainerId string) error {
+	err := c.cli.ContainerRemove(ctx, ContainerId, container.RemoveOptions{})
 	if err != nil {
-		fmt.Println("failed to Pause Container - ", err)
+		fmt.Println("failed to remove Container - ", err)
 		return err
 	}
 	return nil
 }
 
-
+// Rename a container using id
+func (c *ContainerService) RenameContainer(ctx context.Context, ContainerId string, newName string) error {
+	err := c.cli.ContainerRename(ctx, ContainerId, newName)
+	if err != nil {
+		fmt.Println("failed to rename Container - ", err)
+		return err
+	}
+	return nil
+}
