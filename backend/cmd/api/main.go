@@ -1,6 +1,17 @@
 package main
 
 
+import "github.com/gin-gonic/gin"
+
 func main() {
-	println("Hello, API!")
+	r := gin.Default()
+    r.Group("/api/user")
+    {
+
+    }
+    r.Group("/ws")
+    {
+        
+    }
+    r.Run(":8080")
 }
