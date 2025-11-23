@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-
 	"github.com/docker/docker/client"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -34,13 +33,11 @@ const (
 	TypeAck      MessageType = "ack"
 )
 
-
 type WsMessage struct {
 	MachineID string `json:"machine_id" binding:"required"`
 	Type    MessageType   `json:"type" binding:"required"`
 	Data   string        `json:"data" binding:"required"`
 }
-
 var upgrader = websocket.Upgrader{
     ReadBufferSize:  1024,
     WriteBufferSize: 1024,
@@ -75,12 +72,15 @@ func (s *WebsocketService) Wss(ctx *gin.Context) {
 		switch MessageType(MsgJson.Type) {
 		case TypeRegister:
 			s.HanldeRegisterRequest(MsgJson, conn)
-		case TypeResponse:
-			s.HanldeResponseMessage(MsgJson , conn)
+		case TypeEvent:
+			s.HandleEventMessage(MsgJson , conn)
+		default:
+			conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("Unknown message type: %s", MsgJson.Type)))
+		}
         // echo back
 
     }
-}}
+}
 
 func (s *WebsocketService) HanldeRegisterRequest(req WsMessage, conn *websocket.Conn) error {
 	s.Machines[req.MachineID] = conn
@@ -88,19 +88,15 @@ func (s *WebsocketService) HanldeRegisterRequest(req WsMessage, conn *websocket.
 	return nil
 }
 
-func (s *WebsocketService) HanldeResponseMessage(req WsMessage, conn *websocket.Conn) error {
-	// Process the response message as needed
-	fmt.Printf("Response from machine %s: %s\n", req.MachineID, req.Data)
-	return nil
-}
-
-
 func (s *WebsocketService) WaitforRespose(machineID string , ctx context.Context) (string, error) {
 	// clode if timout
 	responseChan, exists := s.pendingResponseChannels[machineID]
-	if !exists {
-		return "", fmt.Errorf("no pending request for machine %s", machineID)
+	if exists {
+		return "", fmt.Errorf("waiting for Existing command  %s", machineID)
 	}
+	responseChan = make(chan string)
+	s.pendingResponseChannels[machineID] = responseChan
+
 	defer func(){
 		close(responseChan)
 		delete(s.pendingResponseChannels, machineID) // Clean up
@@ -116,5 +112,33 @@ func (s *WebsocketService) WaitforRespose(machineID string , ctx context.Context
 	}
 }
 
+func (s *WebsocketService) SendCommandToMachine(machineID string, command interface{}) error {
+	stringMessage, err := json.Marshal(command)
+	if err != nil {
+		return fmt.Errorf("failed to marshal command: %v", err)
+	}
+	connInterface, exists := s.Machines[machineID]
+	if !exists {
+		return fmt.Errorf("machine %s not connected", machineID)
+	}
+	conn, ok := connInterface.(*websocket.Conn)
+	if !ok {
+		return fmt.Errorf("invalid connection for machine %s", machineID)
+	}
+	conn.WriteMessage(websocket.TextMessage, []byte(stringMessage))
+	return nil
+}
+
+func (s *WebsocketService) HandleEventMessage(msg WsMessage, conn *websocket.Conn) error {
+	// Broadcast to all subscribers
+	// replace with notify function
+
+	// save event to db or log
+	// retry mechanism
+	// notify subscribers
+
+	fmt.Printf("Event from machine %s: %s\n", msg.MachineID, msg.Data)
+	return nil
+}
 
 
