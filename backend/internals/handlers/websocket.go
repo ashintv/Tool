@@ -5,24 +5,33 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
+
 	"github.com/docker/docker/client"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
 
-type WebsocketService struct{
-	cli *client.Client // docker client
-	Machines map[string]interface{} // storing machine info for connections
-	pendingResponseChannels map[string]chan string
-	Subscribers map[string]interface{} // map of machineID to list of subscriber channels
+type Subscriber struct {
+	username string
+	conn *websocket.Conn
+	wt *sync.WaitGroup
 }
+type WebsocketService struct{
+	mu sync.Mutex
+	cli *client.Client // docker client
+	Machines map[string]*websocket.Conn // storing machine info for connections
+	pendingResponseChannels map[string]chan string
+	Subscribers map[string][]Subscriber // map of machineID to list of subscriber channels
+}
+
 
 func NewWebsocketService(cli *client.Client) *WebsocketService {
 	return &WebsocketService{
 		cli: cli,
-		Machines: map[string]interface{}{},
+		Machines: map[string]*websocket.Conn{},
 		pendingResponseChannels: map[string]chan string{},
-		Subscribers: map[string]interface{}{},
+		Subscribers: map[string][]Subscriber{},
 	}
 }
 type MessageType string
@@ -117,17 +126,14 @@ func (s *WebsocketService) SendCommandToMachine(machineID string, command interf
 	if err != nil {
 		return fmt.Errorf("failed to marshal command: %v", err)
 	}
-	connInterface, exists := s.Machines[machineID]
+	conn, exists := s.Machines[machineID]
 	if !exists {
 		return fmt.Errorf("machine %s not connected", machineID)
-	}
-	conn, ok := connInterface.(*websocket.Conn)
-	if !ok {
-		return fmt.Errorf("invalid connection for machine %s", machineID)
 	}
 	conn.WriteMessage(websocket.TextMessage, []byte(stringMessage))
 	return nil
 }
+
 
 func (s *WebsocketService) HandleEventMessage(msg WsMessage, conn *websocket.Conn) error {
 	// Broadcast to all subscribers
@@ -142,3 +148,47 @@ func (s *WebsocketService) HandleEventMessage(msg WsMessage, conn *websocket.Con
 }
 
 
+func (s *WebsocketService) AddSubscriber(machineID string, conn *websocket.Conn , username string , wt *sync.WaitGroup) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.Subscribers[machineID] = append(s.Subscribers[machineID] , Subscriber{
+		username: username,
+		conn: conn,
+		wt: wt,
+	})
+	return nil
+}
+
+func (s* WebsocketService) NotifySubscribers(machineID string, event string) error {
+	s.mu.Lock()
+	subscribers, exists := s.Subscribers[machineID]
+	s.mu.Unlock()
+	if !exists {
+		return fmt.Errorf("no subscribers for machine %s", machineID)
+	}
+	for _, sub := range subscribers {
+		err := sub.conn.WriteMessage(websocket.TextMessage, []byte(event))
+		if err != nil {
+			fmt.Printf("Error notifying subscriber %s: %v\n", sub.username, err)
+			continue
+		}
+		sub.wt.Done()
+	}
+	return nil
+}
+
+func (s *WebsocketService) Unsubscribe(machineID string,  username string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	subscribers, exists := s.Subscribers[machineID]
+	if !exists {
+		return fmt.Errorf("no subscribers for machine %s", machineID)
+	}
+	for i, sub := range subscribers {
+		if username== sub.username {
+			s.Subscribers[machineID] = append(subscribers[:i], subscribers[i+1:]...)
+			return nil
+		}
+	}
+	return fmt.Errorf("subscriber %s not found for machine %s", username, machineID)
+}
