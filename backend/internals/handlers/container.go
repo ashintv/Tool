@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"aetrix/observer/lib"
 	"context"
 	"net/http"
 	"sync"
@@ -17,6 +18,7 @@ type RequestStartNewContainer struct {
 	ImageName string `json:"image_name" binding:"required"`
 	MachineID string `json:"machine_id" binding:"required"`
 }
+
 // common for delete , start , restart etc
 type RequestConatiner struct {
 	ContainerID string `json:"container_id" binding:"required"`
@@ -29,11 +31,16 @@ type RequestConatinerRestart struct {
 	ContainerID string `json:"container_id" binding:"required"`
 	MachineID   string `json:"machine_id" binding:"required"`
 }
-type Reponse struct {
-	ContainerId string `json:"container_id"`
-	MachineID   string `json:"machine_id"`
-	Error       error  `json:"error"`
-	Data        string `json:"data"`
+type MachineReponse struct {
+	HTTPResponse struct {
+		Message     string `json:"message"`
+		ContainerId string `json:"container_id"`
+		MachineID   string `json:"machine_id"`
+		Error       error  `json:"error"`
+		Data        string `json:"data"`
+	}
+	Status int // status code need top passed
+	Mu     sync.Mutex
 }
 
 func NewContainerHandler(ws *WebsocketService) *ContainerHandler {
@@ -50,6 +57,7 @@ var upgrader_2 = websocket.Upgrader{
 	},
 }
 
+// TODO: replace with
 func (h *ContainerHandler) LstContainers(ctx *gin.Context) {
 	var req RequestListContainers
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -110,16 +118,51 @@ func (h *ContainerHandler) LstContainers(ctx *gin.Context) {
 }
 
 func (h *ContainerHandler) DeleteContainer(ctx *gin.Context) {
-	var res Reponse
+	var res MachineReponse
 	var req RequestConatiner
-	res.ContainerId = req.ContainerID
-	res.MachineID = req.MachineID
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		res.Error = err
-		ctx.JSON(404, res)
+		res.HTTPResponse.Error = err
+		ctx.JSON(404, gin.H{
+			"error": err.Error(),
+		})
 	}
 
+	ctxTime, cancel := context.WithTimeout(ctx.Request.Context(), 30*time.Second)
+	defer cancel()
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		Message, err := h.ws.WaitforRespose(req.MachineID, ctxTime)
+		res.Mu.Lock()
+		if err != nil {
+			res.HTTPResponse.Error = err
+			res.Status = 500 // TODO: replace with proper one
+			res.HTTPResponse.Message = "agent Failed"
+			return
+		}
+
+		// successfull completion of task
+		res.Status = 200
+		res.HTTPResponse.ContainerId = req.ContainerID
+		res.HTTPResponse.MachineID = req.MachineID
+		res.HTTPResponse.Message = "Container deleted successfully"
+		res.HTTPResponse.Data = Message
+
+	}()
+
+	command := lib.GetCommand(req.ContainerID, req.MachineID, lib.DELETE_CONTAINER)
+	err := h.ws.SendCommandToMachine(req.MachineID, command)
+	if err != nil {
+		ctx.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	wg.Wait()
+	res.Mu.Lock()
+	defer res.Mu.Unlock()
+	ctx.JSON(res.Status, res.HTTPResponse)
 
 }
 
@@ -153,24 +196,23 @@ func (h *ContainerHandler) RestartContainer(ctx *gin.Context) {
 		})
 	}
 
-	conn , err:= upgrader_2.Upgrade(ctx.Writer , ctx.Request,nil)
-	if err!=nil{
-		ctx.JSON(500 , gin.H{
-			"error":"Failed to upgrade to websocket",
+	conn, err := upgrader_2.Upgrade(ctx.Writer, ctx.Request, nil)
+	if err != nil {
+		ctx.JSON(500, gin.H{
+			"error": "Failed to upgrade to websocket",
 		})
 	}
 	defer conn.Close()
 	var wg sync.WaitGroup
 	wg.Add(1)
 	//TODO: replace username
-	h.ws.AddSubscriber(req.MachineID , conn , "usernamw" , &wg)
-	h.ws.SendCommandToMachine(req.MachineID , req)
+	h.ws.AddSubscriber(req.MachineID, conn, "usernamw", &wg)
+	h.ws.SendCommandToMachine(req.MachineID, req)
 	wg.Wait()
 }
 
 func (h *ContainerHandler) StartContainer(ctx *gin.Context) {
 	//TODO: middleware
-
 
 }
 
