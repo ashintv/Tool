@@ -13,43 +13,41 @@ import (
 type ContainerHandler struct {
 	ws *WebsocketService
 }
-
 type RequestStartNewContainer struct {
 	ImageName string `json:"image_name" binding:"required"`
 	MachineID string `json:"machine_id" binding:"required"`
 }
-
 // common for delete , start , restart etc
 type RequestConatiner struct {
 	ContainerID string `json:"container_id" binding:"required"`
-	MachineID string `json:"machine_id" binding:"required"`
+	MachineID   string `json:"machine_id" binding:"required"`
 }
 type RequestListContainers struct {
 	MachineID string `json:"machine_id" binding:"required"`
-
 }
-
-type Reponse struct{
+type RequestConatinerRestart struct {
+	ContainerID string `json:"container_id" binding:"required"`
+	MachineID   string `json:"machine_id" binding:"required"`
+}
+type Reponse struct {
 	ContainerId string `json:"container_id"`
-	MachineID string `json:"machine_id"`
-	Error error `json:"error"`
-	Data string `json:"data"`
+	MachineID   string `json:"machine_id"`
+	Error       error  `json:"error"`
+	Data        string `json:"data"`
 }
+
 func NewContainerHandler(ws *WebsocketService) *ContainerHandler {
 	return &ContainerHandler{
 		ws: ws,
 	}
 }
-const (
-	LIST_CONTAINER = "listContainers"
 
-)
 var upgrader_2 = websocket.Upgrader{
-    ReadBufferSize:  1024,
-    WriteBufferSize: 1024,
-    CheckOrigin: func(r *http.Request) bool {
-        return true // allow all origins (or customize)
-    },
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		return true // allow all origins (or customize)
+	},
 }
 
 func (h *ContainerHandler) LstContainers(ctx *gin.Context) {
@@ -88,7 +86,7 @@ func (h *ContainerHandler) LstContainers(ctx *gin.Context) {
 	}()
 	// send command to machine
 
-	err := h.ws.SendCommandToMachine(req.MachineID, LIST_CONTAINER)
+	err := h.ws.SendCommandToMachine(req.MachineID, req)
 	if err != nil {
 		ctx.JSON(500, gin.H{"error": err.Error()})
 		return
@@ -111,27 +109,24 @@ func (h *ContainerHandler) LstContainers(ctx *gin.Context) {
 
 }
 
-
-func (h *ContainerHandler) DeleteContainer(ctx *gin.Context){
+func (h *ContainerHandler) DeleteContainer(ctx *gin.Context) {
 	var res Reponse
 	var req RequestConatiner
 	res.ContainerId = req.ContainerID
 	res.MachineID = req.MachineID
 
-	if err:= ctx.ShouldBindJSON(&req);err!=nil{
+	if err := ctx.ShouldBindJSON(&req); err != nil {
 		res.Error = err
-		ctx.JSON(404 , res)
+		ctx.JSON(404, res)
 	}
 
 
 }
 
-
-
-func (h *ContainerHandler) StartNewContainer(ctx *gin.Context){
+func (h *ContainerHandler) StartNewContainer(ctx *gin.Context) {
 	var req RequestStartNewContainer
-	if err:= ctx.ShouldBindJSON(&req);err!=nil{
-		ctx.JSON(404 , gin.H{"error": err.Error()})
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(404, gin.H{"error": err.Error()})
 		return
 	}
 	conn, err := upgrader_2.Upgrade(ctx.Writer, ctx.Request, nil)
@@ -141,18 +136,43 @@ func (h *ContainerHandler) StartNewContainer(ctx *gin.Context){
 	}
 	defer conn.Close()
 	var wg sync.WaitGroup
+	//TODO: should  pass a timout
 	// Add subscriber
 	wg.Add(1)
-	h.ws.AddSubscriber(req.MachineID, conn, "username" , &wg) // Replace "username" with actual username
-	h.ws.SendCommandToMachine(req.MachineID ,req)
+	h.ws.AddSubscriber(req.MachineID, conn, "username", &wg) // Replace "username" with actual username
+	h.ws.SendCommandToMachine(req.MachineID, req)
 	wg.Wait()
 }
 
-func (h *ContainerHandler) RestartContainer(ctx *gin.Context){
+func (h *ContainerHandler) RestartContainer(ctx *gin.Context) {
+	// TODO: get username for middleware
+	var req RequestConatinerRestart
+	if err := ctx.Copy().ShouldBindJSON(&req); err != nil {
+		ctx.JSON(404, gin.H{
+			"error": err.Error(),
+		})
+	}
+
+	conn , err:= upgrader_2.Upgrade(ctx.Writer , ctx.Request,nil)
+	if err!=nil{
+		ctx.JSON(500 , gin.H{
+			"error":"Failed to upgrade to websocket",
+		})
+	}
+	defer conn.Close()
+	var wg sync.WaitGroup
+	wg.Add(1)
+	//TODO: replace username
+	h.ws.AddSubscriber(req.MachineID , conn , "usernamw" , &wg)
+	h.ws.SendCommandToMachine(req.MachineID , req)
+	wg.Wait()
 }
 
-func (h *ContainerHandler) StartContainer(ctx *gin.Context){
+func (h *ContainerHandler) StartContainer(ctx *gin.Context) {
+	//TODO: middleware
+
+
 }
 
-func (h *ContainerHandler) PauseContainer(ctx *gin.Context){
+func (h *ContainerHandler) PauseContainer(ctx *gin.Context) {
 }

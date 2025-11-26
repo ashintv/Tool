@@ -29,9 +29,9 @@ type WebsocketService struct{
 func NewWebsocketService(cli *client.Client) *WebsocketService {
 	return &WebsocketService{
 		cli: cli,
-		Machines: map[string]*websocket.Conn{},
-		pendingResponseChannels: map[string]chan string{},
-		Subscribers: map[string][]Subscriber{},
+		Machines: make(map[string]*websocket.Conn),
+		pendingResponseChannels: make(map[string]chan string),
+		Subscribers: make(map[string][]Subscriber),
 	}
 }
 type MessageType string
@@ -192,3 +192,6 @@ func (s *WebsocketService) Unsubscribe(machineID string,  username string) error
 	}
 	return fmt.Errorf("subscriber %s not found for machine %s", username, machineID)
 }
+
+
+func SendAndWait(){}
