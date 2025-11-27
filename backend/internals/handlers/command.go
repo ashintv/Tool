@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"aetrix/observer/lib"
+	"aetrix/observer/internals/lib"
 	"context"
 	"net/http"
 	"sync"

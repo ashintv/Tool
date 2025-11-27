@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"aetrix/observer/lib"
+	"aetrix/observer/internals/lib"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -36,19 +36,6 @@ func NewWebsocketService() *WebsocketService {
 
 type MessageType string
 
-const (
-	TypeRegister MessageType = "register"
-	TypeResponse MessageType = "response"
-	TypeEvent    MessageType = "event"
-	TypeAck      MessageType = "ack"
-)
-
-type WsMessage struct {
-	MachineID string      `json:"machine_id" binding:"required"`
-	Type      MessageType `json:"type" binding:"required"`
-	Data      string      `json:"data" binding:"required"`
-}
-
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
@@ -60,7 +47,7 @@ var upgrader = websocket.Upgrader{
 func (s *WebsocketService) Wss(ctx *gin.Context) {
 	// Upgrade initial GET request to a websocket
 	machineID := ctx.Param("machine_id")
-	
+
 	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 	if err != nil {
 		fmt.Println("Upgrade error:", err)
@@ -68,34 +55,45 @@ func (s *WebsocketService) Wss(ctx *gin.Context) {
 	}
 	s.Machines[machineID] = conn
 	fmt.Printf("Machine %s registered.\n", machineID)
-	
+
 	defer conn.Close()
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
 			break
 		}
-
-		// Handle incoming message
-		var MsgJson WsMessage
-		if err := json.Unmarshal(msg, &MsgJson); err != nil {
-			fmt.Println("Error unmarshalling message:", err)
+		var message lib.WsMessage
+		res := json.Unmarshal(msg, &message)
+		if res != nil {
+			fmt.Printf("Invalid message from machine %s: %v\n", machineID, res)
 			continue
 		}
-		fmt.Printf("Received message from %s: %s\n", conn.RemoteAddr().String(), MsgJson)
-
-		// Process based on message type
-		switch MessageType(MsgJson.Type) {
-		case TypeEvent:
-			s.HandleEventMessage(MsgJson, conn)
+		// Check if there's a pending response channel for this machine
+		switch message.Type {
+		case lib.TypeResponse:
+			s.mu.Lock()
+			responseChan, exists := s.pendingResponseChannels[message.MachineID]
+			s.mu.Unlock()
+			if exists {
+				responseChan <- message.Payload
+			}
+		case lib.TypeEvent:
+			// Notify all subscribers about the event
+			fmt.Printf("Event from machine %s: %s\n", message.MachineID, message.Payload)
+			// send mail 
+			// send restart request
+			// handle other event types
+		case lib.TypeStream:
+			// Notify all subscribers about the stream data
+			err := s.SendToSubscribers(message.MachineID, message.Payload)
+			if err != nil {
+				fmt.Printf("Error notifying subscribers for machine %s: %v\n", message.MachineID, err)
+			}
 		default:
-			conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("Unknown message type: %s", MsgJson.Type)))
+			fmt.Printf("Unknown message type from machine %s: %s\n", message.MachineID, message.Type)
 		}
-		// echo back
-
 	}
 }
-
 
 func (s *WebsocketService) WaitforRespose(machineID string, ctx context.Context) (string, error) {
 	// clode if timout
@@ -134,18 +132,6 @@ func (s *WebsocketService) SendCommandToMachine(command lib.Command) error {
 	return nil
 }
 
-func (s *WebsocketService) HandleEventMessage(msg WsMessage, conn *websocket.Conn) error {
-	// Broadcast to all subscribers
-	// replace with notify function
-
-	// save event to db or log
-	// retry mechanism
-	// notify subscribers
-
-	fmt.Printf("Event from machine %s: %s\n", msg.MachineID, msg.Data)
-	return nil
-}
-
 func (s *WebsocketService) AddSubscriber(machineID string, conn *websocket.Conn, username string, wt *sync.WaitGroup) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -161,7 +147,7 @@ func (s *WebsocketService) AddSubscriber(machineID string, conn *websocket.Conn,
 	}()
 }
 
-func (s *WebsocketService) NotifySubscribers(machineID string, event string) error {
+func (s *WebsocketService) SendToSubscribers(machineID string, event string) error {
 	s.mu.Lock()
 	subscribers, exists := s.Subscribers[machineID]
 	s.mu.Unlock()
@@ -197,5 +183,3 @@ func (s *WebsocketService) Unsubscribe(machineID string, username string) error 
 	}
 	return fmt.Errorf("subscriber %s not found for machine %s", username, machineID)
 }
-
-func SendAndWait() {}
