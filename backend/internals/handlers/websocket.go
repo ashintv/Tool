@@ -1,40 +1,41 @@
 package handlers
 
 import (
+	"aetrix/observer/lib"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 
-	"github.com/docker/docker/client"
+	// "github.com/docker/docker/client"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
 
 type Subscriber struct {
 	username string
-	conn *websocket.Conn
-	wt *sync.WaitGroup
+	conn     *websocket.Conn
+	wt       *sync.WaitGroup
 }
-type WebsocketService struct{
-	mu sync.Mutex
-	cli *client.Client // docker client
-	Machines map[string]*websocket.Conn // storing machine info for connections
+type WebsocketService struct {
+	mu                      sync.Mutex                 // docker client
+	Machines                map[string]*websocket.Conn // storing machine info for connections
 	pendingResponseChannels map[string]chan string
-	Subscribers map[string][]Subscriber // map of machineID to list of subscriber channels
+	Subscribers             map[string][]Subscriber // map of machineID to list of subscriber channels
 }
 
-
-func NewWebsocketService(cli *client.Client) *WebsocketService {
+func NewWebsocketService() *WebsocketService {
 	return &WebsocketService{
-		cli: cli,
-		Machines: make(map[string]*websocket.Conn),
+		Machines:                make(map[string]*websocket.Conn),
 		pendingResponseChannels: make(map[string]chan string),
-		Subscribers: make(map[string][]Subscriber),
+		Subscribers:             make(map[string][]Subscriber),
 	}
 }
+
 type MessageType string
+
 const (
 	TypeRegister MessageType = "register"
 	TypeResponse MessageType = "response"
@@ -43,35 +44,41 @@ const (
 )
 
 type WsMessage struct {
-	MachineID string `json:"machine_id" binding:"required"`
-	Type    MessageType   `json:"type" binding:"required"`
-	Data   string        `json:"data" binding:"required"`
+	MachineID string      `json:"machine_id" binding:"required"`
+	Type      MessageType `json:"type" binding:"required"`
+	Data      string      `json:"data" binding:"required"`
 }
+
 var upgrader = websocket.Upgrader{
-    ReadBufferSize:  1024,
-    WriteBufferSize: 1024,
-    CheckOrigin: func(r *http.Request) bool {
-        return true // allow all origins (or customize)
-    },
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		return true // allow all origins (or customize)
+	},
 }
 
 func (s *WebsocketService) Wss(ctx *gin.Context) {
 	// Upgrade initial GET request to a websocket
+	machineID := ctx.Param("machine_id")
+	
 	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
-    if err != nil {
-        fmt.Println("Upgrade error:", err)
-        return
-    }
-    defer conn.Close()
-    for {
-        _, msg, err := conn.ReadMessage()
-        if err != nil {
-            break
-        }
+	if err != nil {
+		fmt.Println("Upgrade error:", err)
+		return
+	}
+	s.Machines[machineID] = conn
+	fmt.Printf("Machine %s registered.\n", machineID)
+	
+	defer conn.Close()
+	for {
+		_, msg, err := conn.ReadMessage()
+		if err != nil {
+			break
+		}
 
 		// Handle incoming message
-        var MsgJson WsMessage
-		if err:= json.Unmarshal(msg , &MsgJson); err != nil {
+		var MsgJson WsMessage
+		if err := json.Unmarshal(msg, &MsgJson); err != nil {
 			fmt.Println("Error unmarshalling message:", err)
 			continue
 		}
@@ -79,25 +86,18 @@ func (s *WebsocketService) Wss(ctx *gin.Context) {
 
 		// Process based on message type
 		switch MessageType(MsgJson.Type) {
-		case TypeRegister:
-			s.HanldeRegisterRequest(MsgJson, conn)
 		case TypeEvent:
-			s.HandleEventMessage(MsgJson , conn)
+			s.HandleEventMessage(MsgJson, conn)
 		default:
 			conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("Unknown message type: %s", MsgJson.Type)))
 		}
-        // echo back
+		// echo back
 
-    }
+	}
 }
 
-func (s *WebsocketService) HanldeRegisterRequest(req WsMessage, conn *websocket.Conn) error {
-	s.Machines[req.MachineID] = conn
-	fmt.Printf("Machine %s registered.\n", req.MachineID)
-	return nil
-}
 
-func (s *WebsocketService) WaitforRespose(machineID string , ctx context.Context) (string, error) {
+func (s *WebsocketService) WaitforRespose(machineID string, ctx context.Context) (string, error) {
 	// clode if timout
 	responseChan, exists := s.pendingResponseChannels[machineID]
 	if exists {
@@ -106,7 +106,7 @@ func (s *WebsocketService) WaitforRespose(machineID string , ctx context.Context
 	responseChan = make(chan string)
 	s.pendingResponseChannels[machineID] = responseChan
 
-	defer func(){
+	defer func() {
 		close(responseChan)
 		delete(s.pendingResponseChannels, machineID) // Clean up
 	}()
@@ -121,19 +121,18 @@ func (s *WebsocketService) WaitforRespose(machineID string , ctx context.Context
 	}
 }
 
-func (s *WebsocketService) SendCommandToMachine(machineID string, command interface{}) error {
+func (s *WebsocketService) SendCommandToMachine(command lib.Command) error {
 	stringMessage, err := json.Marshal(command)
 	if err != nil {
 		return fmt.Errorf("failed to marshal command: %v", err)
 	}
-	conn, exists := s.Machines[machineID]
+	conn, exists := s.Machines[command.MachineID]
 	if !exists {
-		return fmt.Errorf("machine %s not connected", machineID)
+		return fmt.Errorf("machine %s not connected", command.MachineID)
 	}
 	conn.WriteMessage(websocket.TextMessage, []byte(stringMessage))
 	return nil
 }
-
 
 func (s *WebsocketService) HandleEventMessage(msg WsMessage, conn *websocket.Conn) error {
 	// Broadcast to all subscribers
@@ -147,19 +146,22 @@ func (s *WebsocketService) HandleEventMessage(msg WsMessage, conn *websocket.Con
 	return nil
 }
 
-
-func (s *WebsocketService) AddSubscriber(machineID string, conn *websocket.Conn , username string , wt *sync.WaitGroup) error {
+func (s *WebsocketService) AddSubscriber(machineID string, conn *websocket.Conn, username string, wt *sync.WaitGroup) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.Subscribers[machineID] = append(s.Subscribers[machineID] , Subscriber{
+	s.Subscribers[machineID] = append(s.Subscribers[machineID], Subscriber{
 		username: username,
-		conn: conn,
-		wt: wt,
+		conn:     conn,
+		wt:       wt,
 	})
-	return nil
+
+	go func() {
+		time.Sleep(30 * time.Second) // Example timeout duration
+		wt.Done()
+	}()
 }
 
-func (s* WebsocketService) NotifySubscribers(machineID string, event string) error {
+func (s *WebsocketService) NotifySubscribers(machineID string, event string) error {
 	s.mu.Lock()
 	subscribers, exists := s.Subscribers[machineID]
 	s.mu.Unlock()
@@ -172,12 +174,15 @@ func (s* WebsocketService) NotifySubscribers(machineID string, event string) err
 			fmt.Printf("Error notifying subscriber %s: %v\n", sub.username, err)
 			continue
 		}
-		sub.wt.Done()
+		// TODO: only if stream end message (DONE) is received
+		if event == "DONE" {
+			sub.wt.Done()
+		}
 	}
 	return nil
 }
 
-func (s *WebsocketService) Unsubscribe(machineID string,  username string) error {
+func (s *WebsocketService) Unsubscribe(machineID string, username string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	subscribers, exists := s.Subscribers[machineID]
@@ -185,7 +190,7 @@ func (s *WebsocketService) Unsubscribe(machineID string,  username string) error
 		return fmt.Errorf("no subscribers for machine %s", machineID)
 	}
 	for i, sub := range subscribers {
-		if username== sub.username {
+		if username == sub.username {
 			s.Subscribers[machineID] = append(subscribers[:i], subscribers[i+1:]...)
 			return nil
 		}
@@ -193,5 +198,4 @@ func (s *WebsocketService) Unsubscribe(machineID string,  username string) error
 	return fmt.Errorf("subscriber %s not found for machine %s", username, machineID)
 }
 
-
-func SendAndWait(){}
+func SendAndWait() {}

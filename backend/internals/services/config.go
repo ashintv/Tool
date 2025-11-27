@@ -10,6 +10,7 @@ type ConfigService struct {
 
 }
 
+
 func NewConfigService(fileName string) *ConfigService {
 	return &ConfigService{
 		fileName: fileName,
@@ -33,3 +34,4 @@ func (c *ConfigService) EditConfig() {
 func (c *ConfigService) ValidateConfig() bool {
 	return true
 }
+

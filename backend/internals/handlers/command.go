@@ -11,7 +11,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type ContainerHandler struct {
+type CommandHandler struct {
 	ws *WebsocketService
 }
 
@@ -35,8 +35,8 @@ type MachineReponse struct {
 	Mu     sync.Mutex
 }
 
-func NewContainerHandler(ws *WebsocketService) *ContainerHandler {
-	return &ContainerHandler{
+func NewCommandHandler(ws *WebsocketService) *CommandHandler {
+	return &CommandHandler{
 		ws: ws,
 	}
 }
@@ -51,7 +51,7 @@ var upgrader_2 = websocket.Upgrader{
 
 // request handler to send command via websocket and wait for response
 // post endpoint to send command to machine and wait for response
-func (h *ContainerHandler) SendCommand(ctx *gin.Context) {
+func (h *CommandHandler) SendCommand(ctx *gin.Context) {
 	var req RequestType
 	var res MachineReponse
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -101,7 +101,7 @@ func (h *ContainerHandler) SendCommand(ctx *gin.Context) {
 
 // request handler to send command via websocket and keep the connection open to receive response
 // get endpoint no body should be from parameters
-func (h *ContainerHandler) SendCommandWs(ctx *gin.Context) {
+func (h *CommandHandler) SendCommandWs(ctx *gin.Context) {
 	params := ctx.Request.URL.Query()
 	machineID := params.Get("machine_id")
 	containerID := params.Get("container_id")
