@@ -19,25 +19,28 @@ const (
 type Command struct {
 	ContainerID string
 	MachineID string
-	command CommandType
+	CMD CommandType
+	Stream bool
 }
 
 // Factory method to create Command instances
 // If ContainerID is empty, it indicates a general command
 // that does not target a specific container
-func GetCommand(ContainerID string ,MachineID string , command CommandType) Command{
+func GetCommand(ContainerID string ,MachineID string , command CommandType , stream bool) Command{
 	if ContainerID == "" {
 		return Command{
 			ContainerID: "",
 			MachineID: MachineID,
-			command: command,
+			CMD: command,
+			Stream: stream,
 		}
 	}
 
 	return Command{
-		ContainerID,
-		MachineID,
-		command,
+		ContainerID: ContainerID,
+		MachineID: MachineID,
+		CMD: command,
+		Stream: stream,
 	}
 }
 

@@ -22,14 +22,14 @@ type Subscriber struct {
 type WebsocketService struct {
 	mu                      sync.Mutex                 // docker client
 	Machines                map[string]*websocket.Conn // storing machine info for connections
-	pendingResponseChannels map[string]chan string
+	pendingResponseChannels map[string]chan lib.PayloadType
 	Subscribers             map[string][]Subscriber // map of machineID to list of subscriber channels
 }
 
 func NewWebsocketService() *WebsocketService {
 	return &WebsocketService{
 		Machines:                make(map[string]*websocket.Conn),
-		pendingResponseChannels: make(map[string]chan string),
+		pendingResponseChannels: make(map[string]chan lib.PayloadType),
 		Subscribers:             make(map[string][]Subscriber),
 	}
 }
@@ -75,17 +75,23 @@ func (s *WebsocketService) Wss(ctx *gin.Context) {
 			responseChan, exists := s.pendingResponseChannels[message.MachineID]
 			s.mu.Unlock()
 			if exists {
+
 				responseChan <- message.Payload
 			}
 		case lib.TypeEvent:
 			// Notify all subscribers about the event
 			fmt.Printf("Event from machine %s: %s\n", message.MachineID, message.Payload)
-			// send mail 
+			// send mail
 			// send restart request
 			// handle other event types
 		case lib.TypeStream:
 			// Notify all subscribers about the stream data
-			err := s.SendToSubscribers(message.MachineID, message.Payload)
+			StringFiedPayload, err := json.Marshal(message.Payload)
+			if err != nil {
+				fmt.Printf("Error marshalling stream payload for machine %s: %v\n", message.MachineID, err)
+				continue
+			}
+			err = s.SendToSubscribers(message.MachineID, string(StringFiedPayload))
 			if err != nil {
 				fmt.Printf("Error notifying subscribers for machine %s: %v\n", message.MachineID, err)
 			}
@@ -95,13 +101,13 @@ func (s *WebsocketService) Wss(ctx *gin.Context) {
 	}
 }
 
-func (s *WebsocketService) WaitforRespose(machineID string, ctx context.Context) (string, error) {
+func (s *WebsocketService) WaitforRespose(machineID string, ctx context.Context) (lib.PayloadType, error) {
 	// clode if timout
 	responseChan, exists := s.pendingResponseChannels[machineID]
 	if exists {
-		return "", fmt.Errorf("waiting for Existing command  %s", machineID)
+		return lib.PayloadType{}, fmt.Errorf("waiting for Existing command  %s", machineID)
 	}
-	responseChan = make(chan string)
+	responseChan = make(chan lib.PayloadType)
 	s.pendingResponseChannels[machineID] = responseChan
 
 	defer func() {
@@ -112,7 +118,7 @@ func (s *WebsocketService) WaitforRespose(machineID string, ctx context.Context)
 	// Wait for the response (this will block)
 	select {
 	case <-ctx.Done():
-		return "", fmt.Errorf("timeout waiting for response from machine %s", machineID)
+		return lib.PayloadType{}, fmt.Errorf("timeout waiting for response from machine %s", machineID)
 	case response := <-responseChan:
 		fmt.Printf("Received response for machine %s: %s\n", machineID, response)
 		return response, nil

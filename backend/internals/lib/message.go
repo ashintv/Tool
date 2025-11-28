@@ -8,8 +8,12 @@ const (
 	TypeResponse MessageType = "response"
 	TypeStream   MessageType = "stream"
 )
+type PayloadType struct {
+	Error string      `json:"error"`
+	Data  interface{} `json:"data"`
+}
 type WsMessage struct {
 	Type      MessageType       `json:"type" binding:"required"`
 	MachineID string            `json:"machine_id" binding:"required"`
-	Payload   string            `json:"payload"`
+	Payload   PayloadType       `json:"payload"`
 }

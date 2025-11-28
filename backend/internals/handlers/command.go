@@ -29,7 +29,7 @@ type MachineReponse struct {
 		ContainerId string `json:"container_id"`
 		MachineID   string `json:"machine_id"`
 		Error       error  `json:"error"`
-		Data        string `json:"data"`
+		Data        lib.PayloadType `json:"data"`
 	}
 	Status int // status code need top passed
 	Mu     sync.Mutex
@@ -85,7 +85,7 @@ func (h *CommandHandler) SendCommand(ctx *gin.Context) {
 		res.HTTPResponse.MachineID = req.MachineID
 	}()
 	// send command to machine
-	command := lib.GetCommand(req.ContainerId, req.MachineID, req.Command)
+	command := lib.GetCommand(req.ContainerId, req.MachineID, req.Command , false)
 	err := h.ws.SendCommandToMachine(command)
 	if err != nil {
 		ctx.JSON(500, gin.H{"error": err.Error()})
@@ -111,7 +111,7 @@ func (h *CommandHandler) SendCommandWs(ctx *gin.Context) {
 		return
 	}
 
-	command := lib.GetCommand(containerID, machineID, lib.CommandType(commandType))
+	command := lib.GetCommand(containerID, machineID, lib.CommandType(commandType), true)
 	conn, err := upgrader_2.Upgrade(ctx.Writer, ctx.Request, nil)
 
 	if err != nil {
