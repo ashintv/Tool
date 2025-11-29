@@ -2,6 +2,7 @@ package main
 
 import (
 	"aetrix/observer/internals/handlers"
+	"aetrix/observer/internals/middlewares"
 
 	"github.com/gin-gonic/gin"
 )
@@ -12,7 +13,7 @@ func main() {
 	wsService := handlers.NewWebsocketService()
 	CommandHandler := handlers.NewCommandHandler(wsService)
 
-	api := r.Group("/api")
+	api := r.Group("/api", middlewares.UserMiddleware())
 	{
 		command := api.Group("/command")
 		{
@@ -21,7 +22,7 @@ func main() {
 		}
 	}
 
-	agent := r.Group("/agent-ws")
+	agent := r.Group("/agent-ws", middlewares.MachineMiddleware())
 	{
 		agent.GET("/:machine_id", wsService.Wss)
 	}
