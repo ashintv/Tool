@@ -1,5 +1,6 @@
 package lib
 
+
 type CommandType string
 const (
 	// general container commands that do not need container id
@@ -24,7 +25,14 @@ type StartConatianerParams struct {
 	HostPort     string `json:"host_port"`
 	Name         string `json:"name" binding:"required"`
 }
-
+type ListContainsersParams struct {
+	Size    bool `json:"size"`
+    All     bool `json:"all"`
+    Latest  bool `json:"latest"`
+    Since   string `json:"since"`
+    Before  string `json:"before"`
+    Limit   int `json:"limit"`
+}
 type Params struct {
 	StartParams StartConatianerParams `json:"start_params"`
 }

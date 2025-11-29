@@ -332,3 +332,71 @@ func (cmdr *Commander) HandleDeleteContainer(ctx context.Context, req lib.Comman
 	}
 	SendMessage(conn, wsMessage)
 }
+
+// HandleStopContainer stops a running Docker container by its ID.
+// It uses a 10-second timeout for graceful shutdown and sends a confirmation
+// message through the WebSocket connection.
+// Parameters:
+//   - ctx: Context for cancellation and timeout handling
+//   - req: Command request containing the container ID to stop
+//   - conn: WebSocket connection for sending stop response
+func (Cmdr *Commander) HandleStopContainer(ctx context.Context, req lib.Command, conn *websocket.Conn) {
+	wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
+	log.Println("Processing STOP_CONTAINER command for ContainerID:", req.ContainerID)
+	timeout := 10 // seconds
+	err := Cmdr.dockerClient.ContainerStop(ctx, req.ContainerID, container.StopOptions{Timeout: &timeout})
+	if err != nil {
+		wsMessage.Payload.Error = err.Error()
+	} else {
+		wsMessage.Payload.Data = "Container " + req.ContainerID + " stopped successfully"
+	}
+	if req.Stream {
+		wsMessage.Type = lib.TypeStream
+	}
+	SendMessage(conn, wsMessage)
+}
+
+// HandleRestartContainer restarts a Docker container by its ID.
+// It performs an immediate restart (timeout=0) and sends a confirmation
+// message through the WebSocket connection.
+// Parameters:
+//   - ctx: Context for cancellation and timeout handling
+//   - req: Command request containing the container ID to restart
+//   - conn: WebSocket connection for sending restart response
+func (Cmdr *Commander) HandleRestartContainer(ctx context.Context, req lib.Command, conn *websocket.Conn) {
+	wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
+	log.Println("Processing RESTART_CONTAINER command for ContainerID:", req.ContainerID)
+	timeout := 0 // immediate restart
+	err := Cmdr.dockerClient.ContainerRestart(ctx, req.ContainerID, container.StopOptions{Timeout: &timeout})
+	if err != nil {
+		wsMessage.Payload.Error = err.Error()
+	} else {
+		wsMessage.Payload.Data = "Container " + req.ContainerID + " restarted successfully"
+	}
+	if req.Stream {
+		wsMessage.Type = lib.TypeStream
+	}
+	SendMessage(conn, wsMessage)
+}
+
+// HandleStartContainer starts a stopped Docker container by its ID.
+// It starts an existing container (not creating a new one) and sends a confirmation
+// message through the WebSocket connection.
+// Parameters:
+//   - ctx: Context for cancellation and timeout handling
+//   - req: Command request containing the container ID to start
+//   - conn: WebSocket connection for sending start response
+func (Cmdr *Commander) HandleStartContainer(ctx context.Context, req lib.Command, conn *websocket.Conn) {
+	wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
+	log.Println("Processing START_CONTAINER command for ContainerID:", req.ContainerID)
+	err := Cmdr.dockerClient.ContainerStart(ctx, req.ContainerID, container.StartOptions{})
+	if err != nil {
+		wsMessage.Payload.Error = err.Error()
+	} else {
+		wsMessage.Payload.Data = "Container " + req.ContainerID + " started successfully"
+	}
+	if req.Stream {
+		wsMessage.Type = lib.TypeStream
+	}
+	SendMessage(conn, wsMessage)
+}
