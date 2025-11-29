@@ -13,21 +13,32 @@ func main() {
 
 	wsService := handlers.NewWebsocketService()
 	CommandHandler := handlers.NewCommandHandler(wsService)
-	db := db.InitializeDB()
-	_ = db // to avoid unused variable error
-	api := r.Group("/api", middlewares.UserMiddleware())
+	database := db.InitializeDB()
+	userHandler := handlers.NewUserHandler(database)
+
+	api := r.Group("/api")
 	{
-		command := api.Group("/command")
+		auth := api.Group("/auth")
 		{
-			command.POST("/", CommandHandler.SendCommand)
-			command.GET("/ws", CommandHandler.SendCommandWs)
+			auth.POST("user/login", userHandler.Login)
+			auth.POST("user/signup", userHandler.Signup)
+
+		}
+		user := api.Group("/user", middlewares.UserMiddleware())
+		{
+			user.GET("/profile", userHandler.GetUser)
+			user.PUT("/update", userHandler.UpdateUserDetailas)
+			user.PUT("/change-password", userHandler.ChangePassword)
+			user.POST("/cmd", CommandHandler.SendCommand)
+			user.GET("/cmdws", CommandHandler.SendCommandWs)
+
+		}
+
+		agent := r.Group("/agent", middlewares.MachineMiddleware())
+		{	
+			// WebSocket endpoint for machines to connect
+			agent.GET("/:machine_id", wsService.Wss)
 		}
 	}
-
-	agent := r.Group("/agent-ws", middlewares.MachineMiddleware())
-	{
-		agent.GET("/:machine_id", wsService.Wss)
-	}
-
 	r.Run(":8080")
 }

@@ -7,7 +7,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var MACHINE_JWT_SECRET = []byte("your_secret_key") // Replace with your actual secret key
+// Replace with your actual secret key
 
 func MachineMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -18,7 +18,7 @@ func MachineMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		token, err := lib.ParseToken(tokenString , MACHINE_JWT_SECRET)
+		token, err := lib.ParseToken(tokenString , lib.MACHINE_JWT_SECRET)
 		if err != nil || !token.Valid {
 			c.JSON(401, gin.H{"error": "Invalid or expired token"})
 			c.Abort()
