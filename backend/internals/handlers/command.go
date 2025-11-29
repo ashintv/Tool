@@ -4,6 +4,7 @@ import (
 	"aetrix/observer/internals/lib"
 	"context"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,6 +22,7 @@ type RequestType struct {
 	MachineID   string          `json:"machine_id" binding:"required"`
 	ContainerId string          `json:"container_id"`
 	Command     lib.CommandType `json:"command_type" binding:"required"`
+	Params []string `json:"params"`
 }
 
 type MachineReponse struct {
@@ -85,7 +87,7 @@ func (h *CommandHandler) SendCommand(ctx *gin.Context) {
 		res.HTTPResponse.MachineID = req.MachineID
 	}()
 	// send command to machine
-	command := lib.GetCommand(req.ContainerId, req.MachineID, req.Command , false , []string{})
+	command := lib.GetCommand(req.ContainerId, req.MachineID, req.Command , false , req.Params)
 	err := h.ws.SendCommandToMachine(command)
 	if err != nil {
 		ctx.JSON(500, gin.H{"error": err.Error()})
@@ -106,12 +108,17 @@ func (h *CommandHandler) SendCommandWs(ctx *gin.Context) {
 	machineID := params.Get("machine_id")
 	containerID := params.Get("container_id")
 	commandType := params.Get("command_type")
+	Params := params.Get("params")
+	ParamsArr := []string{}
+	if Params != "" {
+		ParamsArr = strings.Split(Params, ",")
+	}
 	if machineID == "" || commandType == "" {
 		ctx.JSON(400, gin.H{"error": "invalid  parameters"})
 		return
 	}
 
-	command := lib.GetCommand(containerID, machineID, lib.CommandType(commandType), true , []string{})
+	command := lib.GetCommand(containerID, machineID, lib.CommandType(commandType), true , ParamsArr) 
 	conn, err := upgrader_2.Upgrade(ctx.Writer, ctx.Request, nil)
 
 	if err != nil {

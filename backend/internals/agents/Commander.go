@@ -8,6 +8,8 @@ import (
 	"net/url"
 
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/network"
+	"github.com/docker/go-connections/nat"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
@@ -19,7 +21,7 @@ type Commander struct {
 	Config       CommanderConfig
 }
 
-func NewCommander(dockerClient *client.Client , Config *CommanderConfig) *Commander {
+func NewCommander(dockerClient *client.Client, Config *CommanderConfig) *Commander {
 	return &Commander{
 		dockerClient: dockerClient,
 		Config:       *Config,
@@ -27,7 +29,8 @@ func NewCommander(dockerClient *client.Client , Config *CommanderConfig) *Comman
 }
 
 func (Commader *Commander) Run(ctx context.Context) {
-	u := url.URL{Scheme: "ws", Host: Commader.Config.WsServerHOST, Path: Commader.Config.Path}
+	Path := Commader.Config.Path + "/" + Commader.Config.Servername
+	u := url.URL{Scheme: "ws", Host: Commader.Config.WsServerHOST, Path: Path}
 
 	log.Println("Connecting to", u.String())
 
@@ -78,15 +81,12 @@ func (Commader *Commander) Run(ctx context.Context) {
 				wsMessage.Payload.Data = "STREAM_END"
 				wsMessage.Type = lib.TypeStreamEnd
 				SendMessage(conn, wsMessage)
-			}else{
+			} else {
 				wsMessage.Type = lib.TypeResponse
 				wsMessage.Payload.Data = containers
 				SendMessage(conn, wsMessage)
 			}
 			continue
-		case lib.CREATE_CONTAINER:
-			log.Println("Processing CREATE_CONTAINER command")
-			// Add logic to create a new container
 		case lib.DELETE_CONTAINER:
 			log.Println("Processing DELETE_CONTAINER command for ContainerID:", req.ContainerID)
 			// Add logic to delete the specified container
@@ -95,35 +95,11 @@ func (Commader *Commander) Run(ctx context.Context) {
 			// Add logic to stop the specified container
 		case lib.START_CONTAINER:
 			log.Println("Processing START_CONTAINER command for ContainerID:", req.ContainerID)
-			// Add logic to start the specified container
-			imageName := req.Params[0]
-			wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
-			log.Println("Pulling image:", imageName)
-			stream, err := Commader.dockerClient.ImagePull(ctx, imageName, image.PullOptions{})
-			if err != nil {
-				wsMessage.Payload.Error = err.Error()
-				SendMessage(conn, wsMessage)
+			if req.Stream {
+				Commader.HandleStartContainerStream(ctx, req, conn)
 				continue
 			}
-			if req.Stream {
-			buffer := make([]byte, 1024)
-			for {
-				n, err := stream.Read(buffer)
-				if err != nil {
-					break
-				}
-				wsMessage.Type = lib.TypeStream
-				wsMessage.Payload.Data = string(buffer[:n])
-				SendMessage(conn, wsMessage)
-			}
-			wsMessage.Payload.Data = "STREAM_END"
-			wsMessage.Type = lib.TypeStreamEnd
-			SendMessage(conn, wsMessage)
-			} else {
-				wsMessage.Type = lib.TypeResponse
-				wsMessage.Payload.Data = "Image pulled successfully"
-				SendMessage(conn, wsMessage)
-			}
+			Commader.HandleStartContainer(ctx, req, conn)
 		case lib.RESTART_CONTAINER:
 			log.Println("Processing RESTART_CONTAINER command for ContainerID:", req.ContainerID)
 			// Add logic to restart the specified container
@@ -134,16 +110,150 @@ func (Commader *Commander) Run(ctx context.Context) {
 	}
 }
 
-
-func SendMessage(conn *websocket.Conn, message lib.WsMessage)  {
+func SendMessage(conn *websocket.Conn, message lib.WsMessage) {
 	msgBytes, err := json.Marshal(message)
 	if err != nil {
 		log.Println("marshal error:", err)
 		return
 	}
+	log.Println("Sending message:", string(msgBytes), conn.RemoteAddr())
 	err = conn.WriteMessage(websocket.TextMessage, msgBytes)
 	if err != nil {
 		log.Println("write error:", err)
 	}
 }
 
+//TODO: all harder coded config should passes as params
+func (Cmdr *Commander) HandleStartContainerStream(ctx context.Context, req lib.Command, conn *websocket.Conn) {
+	imageName := req.Params[0]
+	wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
+	wsMessage.Payload.Data = "Starting container with image: " + imageName
+	wsMessage.Type = lib.TypeStream
+	SendMessage(conn, wsMessage)
+	log.Println("Pulling image:", imageName)
+	stream, err := Cmdr.dockerClient.ImagePull(ctx, imageName, image.PullOptions{})
+	if err != nil {
+		wsMessage.Payload.Error = err.Error()
+		wsMessage.Type = lib.TypeStreamEnd
+		SendMessage(conn, wsMessage)
+		return
+	}
+	buffer := make([]byte, 1024)
+	for {
+		n, err := stream.Read(buffer)
+		if err != nil {
+			break
+		}
+		wsMessage.Type = lib.TypeStream
+		wsMessage.Payload.Data = string(buffer[:n])
+		SendMessage(conn, wsMessage)
+	}
+	wsMessage.Payload.Data = "Image pulled successfully"
+	SendMessage(conn, wsMessage)
+	config := &container.Config{
+		Image: "redis:latest",
+		ExposedPorts: nat.PortSet{
+			"6379/tcp": struct{}{},
+		},
+	}
+	hostConfig := &container.HostConfig{
+		PortBindings: nat.PortMap{
+			"6379/tcp": []nat.PortBinding{
+				{
+					HostIP:   "0.0.0.0",
+					HostPort: "6379",
+				},
+			},
+		},
+	}
+	wsMessage.Payload.Data = "Config setted successfully"
+	SendMessage(conn, wsMessage)
+	resp, err := Cmdr.dockerClient.ContainerCreate(
+		ctx,
+		config,
+		hostConfig,
+		&network.NetworkingConfig{},
+		nil,
+		"my-redis-container",
+	)
+	wsMessage.Payload.Data = "Container created successfully"
+	SendMessage(conn, wsMessage)
+	if err != nil {
+		log.Println("Container creation error:", err)
+		wsMessage.Payload.Error = err.Error()
+		wsMessage.Type = lib.TypeStreamEnd
+		SendMessage(conn, wsMessage)
+		return
+	}
+
+	// 4. Start the container
+	if err := Cmdr.dockerClient.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+		log.Println("Container start error:", err)
+		wsMessage.Payload.Error = err.Error()
+		wsMessage.Type = lib.TypeStreamEnd
+		SendMessage(conn, wsMessage)
+		return
+	}
+
+	wsMessage.Payload.Data = "Container started successfully with ID: " + resp.ID
+	wsMessage.Type = lib.TypeStreamEnd
+	SendMessage(conn, wsMessage)
+
+}
+
+
+func (Cmdr *Commander) HandleStartContainer(ctx context.Context, req lib.Command, conn *websocket.Conn) {
+	imageName := req.Params[0]
+	wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
+	wsMessage.Type = lib.TypeResponse
+	log.Println("Pulling image:", imageName)
+	_, err := Cmdr.dockerClient.ImagePull(ctx, imageName, image.PullOptions{})
+	if err != nil {
+		wsMessage.Payload.Error = err.Error()
+		SendMessage(conn, wsMessage)
+		return
+	}
+	config := &container.Config{
+		Image: "redis:latest",
+		ExposedPorts: nat.PortSet{
+			"6379/tcp": struct{}{},
+		},
+	}
+	hostConfig := &container.HostConfig{
+		PortBindings: nat.PortMap{
+			"6379/tcp": []nat.PortBinding{
+				{
+					HostIP:   "0.0.0.0",
+					HostPort: "6379",
+				},
+			},
+		},
+	}
+	resp, err := Cmdr.dockerClient.ContainerCreate(
+		ctx,
+		config,
+		hostConfig,
+		&network.NetworkingConfig{},
+		nil,
+		"my-redis-container",
+	)
+	if err != nil {
+		log.Println("Container creation error:", err)
+		wsMessage.Payload.Error = err.Error()
+		wsMessage.Type = lib.TypeStreamEnd
+		SendMessage(conn, wsMessage)
+		return
+	}
+
+	// 4. Start the container
+	if err := Cmdr.dockerClient.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+		log.Println("Container start error:", err)
+		wsMessage.Payload.Error = err.Error()
+		SendMessage(conn, wsMessage)
+		return
+	}
+
+	wsMessage.Payload.Data = "Container started successfully with ID: " + resp.ID
+	SendMessage(conn, wsMessage)
+
+}
