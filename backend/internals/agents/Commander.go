@@ -67,26 +67,8 @@ func (Commader *Commander) Run(ctx context.Context) {
 		// Process the command here
 		switch req.CMD {
 		case lib.LIST_CONTAINERS:
-			wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
 			log.Println("Processing LIST_CONTAINERS command")
-			containers, err := Commader.dockerClient.ContainerList(ctx, container.ListOptions{})
-			if err != nil {
-				wsMessage.Payload.Error = err.Error()
-			}
-			if req.Stream {
-				wsMessage.Type = lib.TypeStream
-				for _, container := range containers {
-					wsMessage.Payload.Data = container
-					SendMessage(conn, wsMessage)
-				}
-				wsMessage.Payload.Data = "STREAM_END"
-				wsMessage.Type = lib.TypeStreamEnd
-				SendMessage(conn, wsMessage)
-			} else {
-				wsMessage.Type = lib.TypeResponse
-				wsMessage.Payload.Data = containers
-				SendMessage(conn, wsMessage)
-			}
+			Commader.HandleListContainers(ctx, req, conn)
 			continue
 		case lib.DELETE_CONTAINER:
 			log.Println("Processing DELETE_CONTAINER command for ContainerID:", req.ContainerID)
@@ -124,7 +106,7 @@ func SendMessage(conn *websocket.Conn, message lib.WsMessage) {
 	}
 }
 
-//TODO: all harder coded config should passes as params
+// TODO: all harder coded config should passes as params
 func (Cmdr *Commander) HandleStartNewContainerStream(ctx context.Context, req lib.Command, conn *websocket.Conn) {
 	Params := req.Params
 	imageName := Params.StartParams.Image
@@ -159,7 +141,7 @@ func (Cmdr *Commander) HandleStartNewContainerStream(ctx context.Context, req li
 		ExposedPorts[port] = struct{}{}
 	}
 	config := &container.Config{
-		Image: imageName,
+		Image:        imageName,
 		ExposedPorts: ExposedPorts,
 	}
 	hostConfig := &container.HostConfig{
@@ -207,7 +189,6 @@ func (Cmdr *Commander) HandleStartNewContainerStream(ctx context.Context, req li
 
 }
 
-
 func (Cmdr *Commander) HandleStartNewContainer(ctx context.Context, req lib.Command, conn *websocket.Conn) {
 	Params := req.Params
 	imageName := Params.StartParams.Image
@@ -228,7 +209,7 @@ func (Cmdr *Commander) HandleStartNewContainer(ctx context.Context, req lib.Comm
 	}
 
 	config := &container.Config{
-		Image: imageName,
+		Image:        imageName,
 		ExposedPorts: ExposedPorts,
 	}
 	hostConfig := &container.HostConfig{
@@ -270,4 +251,42 @@ func (Cmdr *Commander) HandleStartNewContainer(ctx context.Context, req lib.Comm
 
 }
 
+func (cmdr *Commander) HandleListContainers(ctx context.Context, req lib.Command, conn *websocket.Conn) {
+	wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
+	log.Println("Processing LIST_CONTAINERS command")
+	containers, err := cmdr.dockerClient.ContainerList(ctx, container.ListOptions{})
+	if err != nil {
+		wsMessage.Payload.Error = err.Error()
+	}
+	if req.Stream {
+		wsMessage.Type = lib.TypeStream
+		for _, container := range containers {
+			wsMessage.Payload.Data = container
+			SendMessage(conn, wsMessage)
+		}
+		wsMessage.Payload.Data = "STREAM_END"
+		wsMessage.Type = lib.TypeStreamEnd
+		SendMessage(conn, wsMessage)
+	} else {
+		wsMessage.Type = lib.TypeResponse
+		wsMessage.Payload.Data = containers
+		SendMessage(conn, wsMessage)
+	}
+}
+
+
+func (cmdr *Commander) HandleDeleteContainer(ctx context.Context, req lib.Command, conn *websocket.Conn){
+	wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
+	log.Println("Processing DELETE_CONTAINER command for ContainerID:", req.ContainerID)
+	err := cmdr.dockerClient.ContainerRemove(ctx, req.ContainerID, container.RemoveOptions{Force: true})
+	if err != nil {
+		wsMessage.Payload.Error = err.Error()
+	} else {
+		wsMessage.Payload.Data = "Container " + req.ContainerID + " deleted successfully"
+	}
+	if req.Stream {
+		wsMessage.Type = lib.TypeStream
+	}
+	SendMessage(conn, wsMessage)
+}
 
