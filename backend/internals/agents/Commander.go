@@ -4,6 +4,7 @@ import (
 	"aetrix/observer/internals/lib"
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/url"
 
@@ -96,10 +97,10 @@ func (Commader *Commander) Run(ctx context.Context) {
 		case lib.START_CONTAINER:
 			log.Println("Processing START_CONTAINER command for ContainerID:", req.ContainerID)
 			if req.Stream {
-				Commader.HandleStartContainerStream(ctx, req, conn)
+				Commader.HandleStartNewContainerStream(ctx, req, conn)
 				continue
 			}
-			Commader.HandleStartContainer(ctx, req, conn)
+			Commader.HandleStartNewContainer(ctx, req, conn)
 		case lib.RESTART_CONTAINER:
 			log.Println("Processing RESTART_CONTAINER command for ContainerID:", req.ContainerID)
 			// Add logic to restart the specified container
@@ -124,8 +125,9 @@ func SendMessage(conn *websocket.Conn, message lib.WsMessage) {
 }
 
 //TODO: all harder coded config should passes as params
-func (Cmdr *Commander) HandleStartContainerStream(ctx context.Context, req lib.Command, conn *websocket.Conn) {
-	imageName := req.Params[0]
+func (Cmdr *Commander) HandleStartNewContainerStream(ctx context.Context, req lib.Command, conn *websocket.Conn) {
+	Params := req.Params
+	imageName := Params.StartParams.Image
 	wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
 	wsMessage.Payload.Data = "Starting container with image: " + imageName
 	wsMessage.Type = lib.TypeStream
@@ -150,18 +152,22 @@ func (Cmdr *Commander) HandleStartContainerStream(ctx context.Context, req lib.C
 	}
 	wsMessage.Payload.Data = "Image pulled successfully"
 	SendMessage(conn, wsMessage)
+
+	ExposedPorts := nat.PortSet{}
+	if Params.StartParams.ExposedPorts != 0 {
+		port := nat.Port(fmt.Sprintf("%d/%s", Params.StartParams.ExposedPorts, Params.StartParams.Protocol))
+		ExposedPorts[port] = struct{}{}
+	}
 	config := &container.Config{
-		Image: "redis:latest",
-		ExposedPorts: nat.PortSet{
-			"6379/tcp": struct{}{},
-		},
+		Image: imageName,
+		ExposedPorts: ExposedPorts,
 	}
 	hostConfig := &container.HostConfig{
 		PortBindings: nat.PortMap{
 			"6379/tcp": []nat.PortBinding{
 				{
 					HostIP:   "0.0.0.0",
-					HostPort: "6379",
+					HostPort: fmt.Sprintf("%d", Params.StartParams.ExposedPorts),
 				},
 			},
 		},
@@ -202,8 +208,9 @@ func (Cmdr *Commander) HandleStartContainerStream(ctx context.Context, req lib.C
 }
 
 
-func (Cmdr *Commander) HandleStartContainer(ctx context.Context, req lib.Command, conn *websocket.Conn) {
-	imageName := req.Params[0]
+func (Cmdr *Commander) HandleStartNewContainer(ctx context.Context, req lib.Command, conn *websocket.Conn) {
+	Params := req.Params
+	imageName := Params.StartParams.Image
 	wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
 	wsMessage.Type = lib.TypeResponse
 	log.Println("Pulling image:", imageName)
@@ -213,18 +220,23 @@ func (Cmdr *Commander) HandleStartContainer(ctx context.Context, req lib.Command
 		SendMessage(conn, wsMessage)
 		return
 	}
+
+	ExposedPorts := nat.PortSet{}
+	if Params.StartParams.ExposedPorts != 0 {
+		port := nat.Port(fmt.Sprintf("%d/%s", Params.StartParams.ExposedPorts, Params.StartParams.Protocol))
+		ExposedPorts[port] = struct{}{}
+	}
+
 	config := &container.Config{
-		Image: "redis:latest",
-		ExposedPorts: nat.PortSet{
-			"6379/tcp": struct{}{},
-		},
+		Image: imageName,
+		ExposedPorts: ExposedPorts,
 	}
 	hostConfig := &container.HostConfig{
 		PortBindings: nat.PortMap{
 			"6379/tcp": []nat.PortBinding{
 				{
 					HostIP:   "0.0.0.0",
-					HostPort: "6379",
+					HostPort: fmt.Sprintf("%d", Params.StartParams.ExposedPorts),
 				},
 			},
 		},
@@ -235,7 +247,7 @@ func (Cmdr *Commander) HandleStartContainer(ctx context.Context, req lib.Command
 		hostConfig,
 		&network.NetworkingConfig{},
 		nil,
-		"my-redis-container",
+		Params.StartParams.Name,
 	)
 	if err != nil {
 		log.Println("Container creation error:", err)
@@ -257,3 +269,5 @@ func (Cmdr *Commander) HandleStartContainer(ctx context.Context, req lib.Command
 	SendMessage(conn, wsMessage)
 
 }
+
+

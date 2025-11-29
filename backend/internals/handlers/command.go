@@ -3,8 +3,8 @@ package handlers
 import (
 	"aetrix/observer/internals/lib"
 	"context"
+	"encoding/json"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -22,15 +22,15 @@ type RequestType struct {
 	MachineID   string          `json:"machine_id" binding:"required"`
 	ContainerId string          `json:"container_id"`
 	Command     lib.CommandType `json:"command_type" binding:"required"`
-	Params []string `json:"params"`
+	Params      lib.Params     `json:"params"` // parameters for starting container etc
 }
 
 type MachineReponse struct {
 	HTTPResponse struct {
-		Message     string `json:"message"`
-		ContainerId string `json:"container_id"`
-		MachineID   string `json:"machine_id"`
-		Error       error  `json:"error"`
+		Message     string          `json:"message"`
+		ContainerId string          `json:"container_id"`
+		MachineID   string          `json:"machine_id"`
+		Error       error           `json:"error"`
 		Data        lib.PayloadType `json:"data"`
 	}
 	Status int // status code need top passed
@@ -87,7 +87,7 @@ func (h *CommandHandler) SendCommand(ctx *gin.Context) {
 		res.HTTPResponse.MachineID = req.MachineID
 	}()
 	// send command to machine
-	command := lib.GetCommand(req.ContainerId, req.MachineID, req.Command , false , req.Params)
+	command := lib.GetCommand(req.ContainerId, req.MachineID, req.Command, false, req.Params)
 	err := h.ws.SendCommandToMachine(command)
 	if err != nil {
 		ctx.JSON(500, gin.H{"error": err.Error()})
@@ -109,16 +109,20 @@ func (h *CommandHandler) SendCommandWs(ctx *gin.Context) {
 	containerID := params.Get("container_id")
 	commandType := params.Get("command_type")
 	Params := params.Get("params")
-	ParamsArr := []string{}
+	ParamsStruct := lib.Params{}
 	if Params != "" {
-		ParamsArr = strings.Split(Params, ",")
+		err := json.Unmarshal([]byte(Params), &ParamsStruct)
+		if err != nil {
+			ctx.JSON(400, gin.H{"error": "invalid params"})
+			return
+		}
 	}
 	if machineID == "" || commandType == "" {
 		ctx.JSON(400, gin.H{"error": "invalid  parameters"})
 		return
 	}
 
-	command := lib.GetCommand(containerID, machineID, lib.CommandType(commandType), true , ParamsArr) 
+	command := lib.GetCommand(containerID, machineID, lib.CommandType(commandType), true, ParamsStruct)
 	conn, err := upgrader_2.Upgrade(ctx.Writer, ctx.Request, nil)
 
 	if err != nil {
