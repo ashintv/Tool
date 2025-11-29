@@ -22,6 +22,13 @@ type Commander struct {
 	Config       CommanderConfig
 }
 
+// NewCommander creates a new Commander instance with the provided Docker client and configuration.
+// Parameters:
+//   - dockerClient: Docker client instance for container operations
+//   - Config: Commander configuration containing connection and server settings
+//
+// Returns:
+//   - *Commander: A new Commander instance
 func NewCommander(dockerClient *client.Client, Config *CommanderConfig) *Commander {
 	return &Commander{
 		dockerClient: dockerClient,
@@ -29,6 +36,10 @@ func NewCommander(dockerClient *client.Client, Config *CommanderConfig) *Command
 	}
 }
 
+// Run starts the Commander's main execution loop, establishing a WebSocket connection
+// and continuously listening for commands from the server.
+// Parameters:
+//   - ctx: Context for cancellation and timeout handling
 func (Commader *Commander) Run(ctx context.Context) {
 	Path := Commader.Config.Path + "/" + Commader.Config.Servername
 	u := url.URL{Scheme: "ws", Host: Commader.Config.WsServerHOST, Path: Path}
@@ -93,6 +104,11 @@ func (Commader *Commander) Run(ctx context.Context) {
 	}
 }
 
+// SendMessage sends a WebSocket message to the connected client.
+// It marshals the message to JSON and writes it to the WebSocket connection.
+// Parameters:
+//   - conn: WebSocket connection to send the message through
+//   - message: WsMessage to be sent
 func SendMessage(conn *websocket.Conn, message lib.WsMessage) {
 	msgBytes, err := json.Marshal(message)
 	if err != nil {
@@ -106,7 +122,14 @@ func SendMessage(conn *websocket.Conn, message lib.WsMessage) {
 	}
 }
 
+// HandleStartNewContainerStream handles starting a new Docker container with streaming output.
+// It pulls the specified image, creates and starts the container, sending progress updates
+// through the WebSocket connection as a stream.
 // TODO: all harder coded config should passes as params
+// Parameters:
+//   - ctx: Context for cancellation and timeout handling
+//   - req: Command request containing container start parameters
+//   - conn: WebSocket connection for streaming progress updates
 func (Cmdr *Commander) HandleStartNewContainerStream(ctx context.Context, req lib.Command, conn *websocket.Conn) {
 	Params := req.Params
 	imageName := Params.StartParams.Image
@@ -189,6 +212,13 @@ func (Cmdr *Commander) HandleStartNewContainerStream(ctx context.Context, req li
 
 }
 
+// HandleStartNewContainer handles starting a new Docker container without streaming.
+// It pulls the specified image, creates and starts the container, sending a single
+// response message upon completion.
+// Parameters:
+//   - ctx: Context for cancellation and timeout handling
+//   - req: Command request containing container start parameters
+//   - conn: WebSocket connection for sending response
 func (Cmdr *Commander) HandleStartNewContainer(ctx context.Context, req lib.Command, conn *websocket.Conn) {
 	Params := req.Params
 	imageName := Params.StartParams.Image
@@ -251,6 +281,13 @@ func (Cmdr *Commander) HandleStartNewContainer(ctx context.Context, req lib.Comm
 
 }
 
+// HandleListContainers retrieves and returns a list of Docker containers.
+// It can operate in streaming mode (sending containers one by one) or
+// standard mode (sending all containers in a single response).
+// Parameters:
+//   - ctx: Context for cancellation and timeout handling
+//   - req: Command request with optional streaming flag
+//   - conn: WebSocket connection for sending container list
 func (cmdr *Commander) HandleListContainers(ctx context.Context, req lib.Command, conn *websocket.Conn) {
 	wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
 	log.Println("Processing LIST_CONTAINERS command")
@@ -274,8 +311,14 @@ func (cmdr *Commander) HandleListContainers(ctx context.Context, req lib.Command
 	}
 }
 
-
-func (cmdr *Commander) HandleDeleteContainer(ctx context.Context, req lib.Command, conn *websocket.Conn){
+// HandleDeleteContainer removes a Docker container by its ID.
+// It forcefully removes the container and sends a confirmation message
+// through the WebSocket connection.
+// Parameters:
+//   - ctx: Context for cancellation and timeout handling
+//   - req: Command request containing the container ID to delete
+//   - conn: WebSocket connection for sending deletion response
+func (cmdr *Commander) HandleDeleteContainer(ctx context.Context, req lib.Command, conn *websocket.Conn) {
 	wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
 	log.Println("Processing DELETE_CONTAINER command for ContainerID:", req.ContainerID)
 	err := cmdr.dockerClient.ContainerRemove(ctx, req.ContainerID, container.RemoveOptions{Force: true})
@@ -289,4 +332,3 @@ func (cmdr *Commander) HandleDeleteContainer(ctx context.Context, req lib.Comman
 	}
 	SendMessage(conn, wsMessage)
 }
-
