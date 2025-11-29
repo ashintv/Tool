@@ -1,6 +1,7 @@
 package main
 
 import (
+	"aetrix/observer/internals/db"
 	"aetrix/observer/internals/handlers"
 	"aetrix/observer/internals/middlewares"
 
@@ -12,7 +13,8 @@ func main() {
 
 	wsService := handlers.NewWebsocketService()
 	CommandHandler := handlers.NewCommandHandler(wsService)
-
+	db := db.InitializeDB()
+	_ = db // to avoid unused variable error
 	api := r.Group("/api", middlewares.UserMiddleware())
 	{
 		command := api.Group("/command")
