@@ -85,7 +85,7 @@ func (h *CommandHandler) SendCommand(ctx *gin.Context) {
 		res.HTTPResponse.MachineID = req.MachineID
 	}()
 	// send command to machine
-	command := lib.GetCommand(req.ContainerId, req.MachineID, req.Command , false)
+	command := lib.GetCommand(req.ContainerId, req.MachineID, req.Command , false , []string{})
 	err := h.ws.SendCommandToMachine(command)
 	if err != nil {
 		ctx.JSON(500, gin.H{"error": err.Error()})
@@ -111,7 +111,7 @@ func (h *CommandHandler) SendCommandWs(ctx *gin.Context) {
 		return
 	}
 
-	command := lib.GetCommand(containerID, machineID, lib.CommandType(commandType), true)
+	command := lib.GetCommand(containerID, machineID, lib.CommandType(commandType), true , []string{})
 	conn, err := upgrader_2.Upgrade(ctx.Writer, ctx.Request, nil)
 
 	if err != nil {

@@ -11,7 +11,7 @@ const (
 	STOP_CONTAINER = "stop_container"
 	START_CONTAINER = "start_container"
 	RESTART_CONTAINER = "restart_container"
-	
+
 )
 
 
@@ -21,18 +21,20 @@ type Command struct {
 	MachineID string
 	CMD CommandType
 	Stream bool
+	Params []string
 }
 
 // Factory method to create Command instances
 // If ContainerID is empty, it indicates a general command
 // that does not target a specific container
-func GetCommand(ContainerID string ,MachineID string , command CommandType , stream bool) Command{
+func GetCommand(ContainerID string ,MachineID string , command CommandType , stream bool, params []string) Command{
 	if ContainerID == "" {
 		return Command{
 			ContainerID: "",
 			MachineID: MachineID,
 			CMD: command,
 			Stream: stream,
+			Params: params,
 		}
 	}
 
@@ -41,8 +43,7 @@ func GetCommand(ContainerID string ,MachineID string , command CommandType , str
 		MachineID: MachineID,
 		CMD: command,
 		Stream: stream,
+		Params: params,
 	}
 }
-
-
 
