@@ -22,10 +22,10 @@ type RequestType struct {
 	MachineID   string          `json:"machine_id" binding:"required"`
 	ContainerId string          `json:"container_id"`
 	Command     lib.CommandType `json:"command_type" binding:"required"`
-	Params      lib.Params     `json:"params"` // parameters for starting container etc
+	Params      lib.Params      `json:"params"` // parameters for starting container etc
 }
 
-type MachineReponse struct {
+type MachineResponse struct {
 	HTTPResponse struct {
 		Message     string          `json:"message"`
 		ContainerId string          `json:"container_id"`
@@ -55,7 +55,7 @@ var upgrader_2 = websocket.Upgrader{
 // post endpoint to send command to machine and wait for response
 func (h *CommandHandler) SendCommand(ctx *gin.Context) {
 	var req RequestType
-	var res MachineReponse
+	var res MachineResponse
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(400, gin.H{"error": err.Error()})
 		return

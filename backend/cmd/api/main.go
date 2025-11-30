@@ -4,6 +4,7 @@ import (
 	"aetrix/observer/internals/db"
 	"aetrix/observer/internals/handlers"
 	"aetrix/observer/internals/middlewares"
+	"log"
 
 	"github.com/gin-gonic/gin"
 )
@@ -30,15 +31,19 @@ func main() {
 			user.PUT("/update", userHandler.UpdateUserDetailas)
 			user.PUT("/change-password", userHandler.ChangePassword)
 			user.POST("/cmd", CommandHandler.SendCommand)
-			user.GET("/cmdws", CommandHandler.SendCommandWs)
+			user.GET("/cmd", CommandHandler.SendCommandWs)
 
 		}
 
 		agent := r.Group("/agent", middlewares.MachineMiddleware())
-		{	
+		{
 			// WebSocket endpoint for machines to connect
 			agent.GET("/:machine_id", wsService.Wss)
 		}
 	}
-	r.Run(":8080")
+	err := r.Run(":8080")
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
 }

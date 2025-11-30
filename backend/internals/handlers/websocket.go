@@ -5,10 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"sync"
 	"time"
-
 	// "github.com/docker/docker/client"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -79,19 +79,18 @@ func (s *WebsocketService) Wss(ctx *gin.Context) {
 				responseChan <- message.Payload
 			}
 		case lib.TypeEvent:
-			// Notify all subscribers about the event
 			fmt.Printf("Event from machine %s: %s\n", message.MachineID, message.Payload)
 			// send mail
 			// send restart request
 			// handle other event types
 		case lib.TypeStream:
 			// Notify all subscribers about the stream data
-			StringFiedPayload, err := json.Marshal(message.Payload)
+			Payload, err := json.Marshal(message.Payload)
 			if err != nil {
 				fmt.Printf("Error marshalling stream payload for machine %s: %v\n", message.MachineID, err)
 				continue
 			}
-			err = s.SendToSubscribers(message.MachineID, string(StringFiedPayload))
+			err = s.SendToSubscribers(message.MachineID, string(Payload))
 			if err != nil {
 				fmt.Printf("Error notifying subscribers for machine %s: %v\n", message.MachineID, err)
 			}
@@ -102,7 +101,7 @@ func (s *WebsocketService) Wss(ctx *gin.Context) {
 }
 
 func (s *WebsocketService) WaitforRespose(machineID string, ctx context.Context) (lib.PayloadType, error) {
-	// clode if timout
+	// clode if timeout
 	responseChan, exists := s.pendingResponseChannels[machineID]
 	if exists {
 		return lib.PayloadType{}, fmt.Errorf("waiting for Existing command  %s", machineID)
@@ -188,4 +187,48 @@ func (s *WebsocketService) Unsubscribe(machineID string, username string) error 
 		}
 	}
 	return fmt.Errorf("subscriber %s not found for machine %s", username, machineID)
+}
+
+func (s *WebsocketService) HandleEvents(ctx context.Context, machineID string, Message lib.WsMessage) {
+	EventType := Message.Payload.Event
+	switch EventType {
+	case lib.UNEXPECTED_STOP:
+
+		//TODO:
+		// hash the retries
+		// when hit threshold report the incident to users
+		// add response mechanism same as handlers
+		ContID := Message.Payload.ContainerID
+		Params := lib.Params{
+			ContainerID: ContID,
+		}
+
+		ctxTime, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+		var mu sync.Mutex
+		var wg sync.WaitGroup
+		wg.Add(1)
+		// start
+		go func() {
+			defer wg.Done()
+			Res_, err := s.WaitforRespose(machineID, ctxTime)
+			mu.Lock()
+			defer mu.Unlock()
+			_ = Res_
+			_ = err
+			// store the result
+		}()
+		// send command to machine
+		Command := lib.GetCommand(ContID, machineID, lib.START_CONTAINER, false, Params)
+		err := s.SendCommandToMachine(Command)
+		if err != nil {
+			log.Printf("Failed to send command to machine %s: %v\n", machineID, err)
+			return
+		}
+
+		// wait for response or timeout
+		wg.Wait()
+		mu.Lock()
+		defer mu.Unlock()
+	}
 }
