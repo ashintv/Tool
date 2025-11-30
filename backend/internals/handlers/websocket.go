@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"aetrix/observer/internals/lib"
+	"aetrix/observer/internals/services"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
 	// "github.com/docker/docker/client"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -24,6 +26,7 @@ type WebsocketService struct {
 	Machines                map[string]*websocket.Conn // storing machine info for connections
 	pendingResponseChannels map[string]chan lib.PayloadType
 	Subscribers             map[string][]Subscriber // map of machineID to list of subscriber channels
+	RetryHash               *services.HashMap[int]
 }
 
 func NewWebsocketService() *WebsocketService {
@@ -31,10 +34,14 @@ func NewWebsocketService() *WebsocketService {
 		Machines:                make(map[string]*websocket.Conn),
 		pendingResponseChannels: make(map[string]chan lib.PayloadType),
 		Subscribers:             make(map[string][]Subscriber),
+		RetryHash:               services.NewHashMap[int](),
 	}
 }
 
 type MessageType string
+
+// should be in config
+const MAX_RETRIES = 3
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -193,42 +200,57 @@ func (s *WebsocketService) HandleEvents(ctx context.Context, machineID string, M
 	EventType := Message.Payload.Event
 	switch EventType {
 	case lib.UNEXPECTED_STOP:
-
-		//TODO:
-		// hash the retries
-		// when hit threshold report the incident to users
-		// add response mechanism same as handlers
-		ContID := Message.Payload.ContainerID
-		Params := lib.Params{
-			ContainerID: ContID,
+		trial, exists := s.RetryHash.Get(machineID)
+		if exists {
+			if trial >= MAX_RETRIES {
+				log.Printf("Max retries reached for machine %s", machineID)
+				return
+			}
+			s.RetryHash.Set(machineID, trial+1, 10*time.Minute)
+		} else {
+			s.RetryHash.Set(machineID, 1, 10*time.Minute)
 		}
 
-		ctxTime, cancel := context.WithTimeout(ctx, 30*time.Second)
+		contID := Message.Payload.ContainerID
+		params := lib.Params{ContainerID: contID}
+
+		ctxTimeout, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
-		var mu sync.Mutex
-		var wg sync.WaitGroup
-		wg.Add(1)
-		// start
+
+		resultChan := make(chan lib.PayloadType, 1)
+		errChan := make(chan error, 1)
+
+		// async waiter
 		go func() {
-			defer wg.Done()
-			Res_, err := s.WaitforRespose(machineID, ctxTime)
-			mu.Lock()
-			defer mu.Unlock()
-			_ = Res_
-			_ = err
-			// store the result
+			res, err := s.WaitforRespose(machineID, ctxTimeout)
+			if err != nil {
+				errChan <- err
+				return
+			}
+			resultChan <- res
 		}()
-		// send command to machine
-		Command := lib.GetCommand(ContID, machineID, lib.START_CONTAINER, false, Params)
-		err := s.SendCommandToMachine(Command)
-		if err != nil {
-			log.Printf("Failed to send command to machine %s: %v\n", machineID, err)
+
+		// send command
+		cmd := lib.GetCommand(contID, machineID, lib.START_CONTAINER, false, params)
+		if err := s.SendCommandToMachine(cmd); err != nil {
+			log.Printf("SendCommand failed: %v", err)
 			return
 		}
 
-		// wait for response or timeout
-		wg.Wait()
-		mu.Lock()
-		defer mu.Unlock()
+		select {
+		case err := <-errChan:
+			log.Printf("Restart failed on machine %s: %v", machineID, err)
+			return
+		case res := <-resultChan:
+			log.Printf("Container %s restarted on machine %s", contID, machineID)
+			_ = res
+			return
+		case <-ctxTimeout.Done():
+			log.Printf("Restart timed out on machine %s", machineID)
+			return
+		}
+
+	default:
+		log.Printf("Unhandled event type %s from machine %s\n", EventType, machineID)
 	}
 }

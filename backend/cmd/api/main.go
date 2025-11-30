@@ -16,7 +16,7 @@ func main() {
 	CommandHandler := handlers.NewCommandHandler(wsService)
 	database := db.InitializeDB()
 	userHandler := handlers.NewUserHandler(database)
-
+	
 	api := r.Group("/api")
 	{
 		auth := api.Group("/auth")
