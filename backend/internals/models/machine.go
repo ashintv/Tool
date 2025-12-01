@@ -3,14 +3,13 @@ package models
 import "time"
 
 type Machine struct {
-	ID        uint      `gorm:"primaryKey"`
-	MachineName string    `gorm:"unique;not null"`
+	ID   uint   `gorm:"primaryKey"`
+	Name string `gorm:"unique;not null"`
 
 	CreatorID uint
-	Creator   User `gorm:"foreignKey:CreatorID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
+	Creator   User   `gorm:"foreignKey:CreatorID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
 	Users     []User `gorm:"many2many:machine_users;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
 
 	IP        string
 	CreatedAt time.Time
 }
-
