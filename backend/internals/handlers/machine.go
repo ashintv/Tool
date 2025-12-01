@@ -1,7 +1,10 @@
 package handlers
 
 import (
+
 	"aetrix/observer/internals/models"
+	"fmt"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -19,6 +22,16 @@ type RegisterMachineRequest struct {
 	Name  string `json:"name" binding:"required"`
 	Users []uint `json:"users" binding:"required"`
 	IP    string `json:"ip" binding:"required"`
+}
+type UpdateMachineRequest struct {
+	ID   uint   `json:"id" binding:"required" `
+	Name string `json:"name"`
+	IP   string `json:"ip"`
+}
+
+type UserEditRequest struct {
+	ID    uint   `json:"id" binding:"required" `
+	Users []uint `json:"users" binding:"required"`
 }
 
 func (h *MachineHandler) RegisterMachine(ctx *gin.Context) {
@@ -112,16 +125,161 @@ func (h *MachineHandler) GetMachine(ctx *gin.Context) {
 }
 
 func (h *MachineHandler) UpdateMachine(ctx *gin.Context) {
+	var req UpdateMachineRequest
+	userId := ctx.MustGet("user_id").(uint)
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(400, gin.H{
+			"message": "Invalid request",
+			"err":     err.Error(),
+		})
+		return
+	}
+	var machine models.Machine
+	if err := h.db.Where("id = ?", &machine).Error; err != nil {
+		ctx.JSON(400, gin.H{
+			"message": "failed to fetch",
+			"err":     err.Error(),
+		})
+		return
+	}
+	if machine.Creator.ID != userId {
+		ctx.JSON(400, gin.H{
+			"message": "No permission",
+			"err":     fmt.Errorf("Creator Mismatch"),
+		})
+		return
+	}
+	if req.Name != "" {
+		machine.Name = req.Name
+	}
+	if req.IP != "" {
+		machine.IP = req.IP
+	}
 
+	if err := h.db.Save(&machine).Error; err != nil {
+		ctx.JSON(400, gin.H{
+			"message": "failed to update the data",
+			"err":     err.Error(),
+		})
+		return
+	}
+	ctx.JSON(200, gin.H{"message": "machine updated", "machine": machine})
 }
 
 func (h *MachineHandler) DeleteMachine(ctx *gin.Context) {
+	machineId := ctx.Param("machineId")
+	parsedId, err := strconv.ParseUint(machineId, 10, 64)
+	if err != nil {
+		ctx.JSON(400, gin.H{
+			"message": "invalid credentials",
+			"err":     err.Error(),
+		})
+		return
 
+	}
+	err = h.db.Delete(&models.Machine{}, parsedId).Error
+	if err != nil {
+		ctx.JSON(400, gin.H{
+			"message": "failed to delete the ",
+			"err":     err.Error(),
+		})
+		return
+	}
+	ctx.JSON(200, gin.H{
+		"message": "machine deleted successfully",
+	})
+	return
 }
 
 func (h *MachineHandler) AddUser(ctx *gin.Context) {
+	var req UserEditRequest
+	userId := ctx.MustGet("user_id").(uint)
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(400, gin.H{
+			"message": "Invalid request",
+			"err":     err.Error(),
+		})
+		return
+	}
+
+	var machine models.Machine
+	if err := h.db.Where("id = ? and creator_id = ?", req.ID, userId).
+		Find(&machine).
+		Preload("Users").
+		Error; err != nil {
+		ctx.JSON(400, gin.H{
+			"message": "Wrong Id or unauthorized",
+			"err":     err.Error(),
+		})
+		return
+	}
+
+	var NewUsers []models.User
+	if err := h.db.Where("id IN ?", req.Users).Find(&NewUsers).Error; err != nil {
+		ctx.JSON(500, gin.H{
+			"error": "User not found",
+			"err":   err.Error(),
+		})
+		return
+	}
+
+	machine.Users = append(machine.Users, NewUsers...)
+	if err := h.db.Save(&machine).Error; err != nil {
+		ctx.JSON(500, gin.H{
+			"error": "Unable add users",
+			"err":   err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(200, gin.H{
+		"message": "users added successfully",
+		"data":    machine,
+	})
 }
 
 func (h *MachineHandler) RemoveUser(ctx *gin.Context) {
+	var req UserEditRequest
+	userId := ctx.MustGet("user_id").(uint)
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(400, gin.H{
+			"message": "Invalid request",
+			"err":     err.Error(),
+		})
+		return
+	}
 
+	var machine models.Machine
+	if err := h.db.Where("id = ? and creator_id = ?", req.ID, userId).
+		Find(&machine).
+		Preload("Users").
+		Error; err != nil {
+		ctx.JSON(400, gin.H{
+			"message": "Wrong Id or unauthorized",
+			"err":     err.Error(),
+		})
+		return
+	}
+	var NewUsers []models.User
+	for _, id := range req.Users {
+		for _, User := range machine.Users {
+			if id != User.ID {
+				NewUsers = append(NewUsers, User)
+			}
+
+		}
+	}
+	machine.Users = NewUsers
+	if err := h.db.Save(&machine).Error; err != nil {
+		ctx.JSON(500, gin.H{
+			"error": "Unable add users",
+			"err":   err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(200, gin.H{
+		"message": "users added successfully",
+		"data":    machine,
+	})
 }
