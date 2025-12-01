@@ -16,7 +16,8 @@ func main() {
 	CommandHandler := handlers.NewCommandHandler(wsService)
 	database := db.InitializeDB()
 	userHandler := handlers.NewUserHandler(database)
-	
+	MachineHandler := handlers.NewMachineHandler(database)
+
 	api := r.Group("/api")
 	{
 		auth := api.Group("/auth")
@@ -27,17 +28,27 @@ func main() {
 		}
 		user := api.Group("/user", middlewares.UserMiddleware())
 		{
+
 			user.GET("/profile", userHandler.GetUser)
 			user.PUT("/update", userHandler.UpdateUserDetailas)
 			user.PUT("/change-password", userHandler.ChangePassword)
+
 			user.POST("/cmd", CommandHandler.SendCommand)
 			user.GET("/cmd", CommandHandler.SendCommandWs)
+
+			user.GET("/machine/:machine_id", MachineHandler.GetMachine)
+			user.GET("/machine/owned", MachineHandler.ListMachinesOfUser)
+			user.GET("/machine/usable", MachineHandler.ListUsableMachine)
+			user.POST("/machine", MachineHandler.RegisterMachine)
+			user.PUT("/machine", MachineHandler.UpdateMachine)
+			user.PUT("/machine/add/user", MachineHandler.AddUser)
+			user.PUT("/machine/remove/user", MachineHandler.RemoveUser)
+			user.DELETE("/machine/:machine_id", MachineHandler.DeleteMachine)
 
 		}
 
 		agent := r.Group("/agent", middlewares.MachineMiddleware())
 		{
-			// WebSocket endpoint for machines to connect
 			agent.GET("/:machine_id", wsService.Wss)
 		}
 	}
