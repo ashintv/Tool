@@ -82,7 +82,6 @@ func (s *WebsocketService) Wss(ctx *gin.Context) {
 			responseChan, exists := s.pendingResponseChannels[message.MachineID]
 			s.mu.Unlock()
 			if exists {
-
 				responseChan <- message.Payload
 			}
 		case lib.TypeEvent:
@@ -107,7 +106,7 @@ func (s *WebsocketService) Wss(ctx *gin.Context) {
 	}
 }
 
-func (s *WebsocketService) WaitforRespose(machineID string, ctx context.Context) (lib.PayloadType, error) {
+func (s *WebsocketService) WaitForResponse(machineID string, ctx context.Context) (lib.PayloadType, error) {
 	// clode if timeout
 	responseChan, exists := s.pendingResponseChannels[machineID]
 	if exists {
@@ -222,7 +221,7 @@ func (s *WebsocketService) HandleEvents(ctx context.Context, machineID string, M
 
 		// async waiter
 		go func() {
-			res, err := s.WaitforRespose(machineID, ctxTimeout)
+			res, err := s.WaitForResponse(machineID, ctxTimeout)
 			if err != nil {
 				errChan <- err
 				return

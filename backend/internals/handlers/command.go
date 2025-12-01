@@ -55,38 +55,27 @@ var upgrader_2 = websocket.Upgrader{
 // post endpoint to send command to machine and wait for response
 func (h *CommandHandler) SendCommand(ctx *gin.Context) {
 	var req RequestType
-	var res MachineResponse
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
-	//TODO: add task to database or in-memory store
-	//start listening for response from machine
+	//TODO: add task to database for command history feature
+
 	ctxTime, cancel := context.WithTimeout(ctx.Request.Context(), 30*time.Second)
 	defer cancel()
-	var mu sync.Mutex
-	var waitgroup sync.WaitGroup
-	waitgroup.Add(1)
-	// start
+	ResponseChan := make(chan lib.PayloadType)
+	ErrorChan := make(chan error)
+
 	go func() {
-		defer waitgroup.Done()
-		Res_, err := h.ws.WaitforRespose(req.MachineID, ctxTime)
-		mu.Lock()
-		defer mu.Unlock()
+		res, err := h.ws.WaitForResponse(req.MachineID, ctxTime)
 		if err != nil {
-			res.HTTPResponse.Error = err
-			res.Status = 500 // TODO: replace with proper one
-			res.HTTPResponse.Message = "agent Failed"
+			ErrorChan <- err
 			return
 		}
-
-		res.HTTPResponse.Data = Res_
-		res.Status = 200
-		res.HTTPResponse.Message = "Containers fetched successfully"
-		res.HTTPResponse.MachineID = req.MachineID
+		ResponseChan <- res
 	}()
-	// send command to machine
+
 	command := lib.GetCommand(req.ContainerId, req.MachineID, req.Command, false, req.Params)
 	err := h.ws.SendCommandToMachine(command)
 	if err != nil {
@@ -94,11 +83,14 @@ func (h *CommandHandler) SendCommand(ctx *gin.Context) {
 		return
 	}
 
-	// wait for response or timeout
-	waitgroup.Wait()
-	mu.Lock()
-	defer mu.Unlock()
-	ctx.JSON(res.Status, res.HTTPResponse)
+	select {
+	case Res := <-ResponseChan:
+		ctx.JSON(200, Res)
+		return
+	case err := <-ErrorChan:
+		ctx.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
 }
 
 // request handler to send command via websocket and keep the connection open to receive response
