@@ -15,7 +15,7 @@ const (
 	START_CONTAINER     = "start_container"
 )
 
-type StartNewContainerParams struct {
+type StartNewContainerConfig struct {
 	Image        string `json:"image" binding:"required"`
 	ExposedPorts int    `json:"exposed_ports"`
 	Protocol     string `json:"protocol"`
@@ -24,19 +24,15 @@ type StartNewContainerParams struct {
 	Name         string `json:"name" binding:"required"`
 }
 
-type ListContainersParams struct {
-	Size   bool   `json:"size"`
-	All    bool   `json:"all"`
-	Latest bool   `json:"latest"`
-	Since  string `json:"since"`
-	Before string `json:"before"`
-	Limit  int    `json:"limit"`
+type ListContainersConfig struct {
+	Size bool `json:"size"`
+	All  bool `json:"all"`
 }
 
 type Params struct {
-	StartParams          StartNewContainerParams `json:"start_params"`
-	ListContainersParams ListContainersParams    `json:"list_containers_params"`
-	ContainerID          string                  `json:"container_id"`
+	StartNewContainerConfig StartNewContainerConfig `json:"start_params"`
+	ListContainersConfig    ListContainersConfig    `json:"list_containers_params"`
+	ContainerID             string                  `json:"container_id"`
 }
 
 // TODO: replace

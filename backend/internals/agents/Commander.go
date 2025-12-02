@@ -138,8 +138,8 @@ func SendMessage(conn *websocket.Conn, message lib.WsMessage) {
 //   - req: Command request containing container start parameters
 //   - conn: WebSocket connection for streaming progress updates
 func (Cmdr *Commander) HandleStartNewContainerStream(ctx context.Context, req lib.Command, conn *websocket.Conn) {
-	Params := req.Params
-	imageName := Params.StartParams.Image
+	configs := req.Params.StartNewContainerConfig
+	imageName := configs.Image
 	wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
 	wsMessage.Payload.Data = "Starting container with image: " + imageName
 	wsMessage.Type = lib.TypeStream
@@ -166,8 +166,8 @@ func (Cmdr *Commander) HandleStartNewContainerStream(ctx context.Context, req li
 	SendMessage(conn, wsMessage)
 
 	ExposedPorts := nat.PortSet{}
-	if Params.StartParams.ExposedPorts != 0 {
-		port := nat.Port(fmt.Sprintf("%d/%s", Params.StartParams.ExposedPorts, Params.StartParams.Protocol))
+	if configs.ExposedPorts != 0 {
+		port := nat.Port(fmt.Sprintf("%d/%s", configs.ExposedPorts, configs.Protocol))
 		ExposedPorts[port] = struct{}{}
 	}
 	config := &container.Config{
@@ -176,15 +176,15 @@ func (Cmdr *Commander) HandleStartNewContainerStream(ctx context.Context, req li
 	}
 	hostConfig := &container.HostConfig{
 		PortBindings: nat.PortMap{
-			"6379/tcp": []nat.PortBinding{
+			nat.Port(configs.HostPort): []nat.PortBinding{
 				{
 					HostIP:   "0.0.0.0",
-					HostPort: fmt.Sprintf("%d", Params.StartParams.ExposedPorts),
+					HostPort: fmt.Sprintf("%d", configs.ExposedPorts),
 				},
 			},
 		},
 	}
-	wsMessage.Payload.Data = "Config setted successfully"
+	wsMessage.Payload.Data = "Config set successfully"
 	SendMessage(conn, wsMessage)
 	resp, err := Cmdr.dockerClient.ContainerCreate(
 		ctx,
@@ -192,7 +192,7 @@ func (Cmdr *Commander) HandleStartNewContainerStream(ctx context.Context, req li
 		hostConfig,
 		&network.NetworkingConfig{},
 		nil,
-		"my-redis-container",
+		configs.Name,
 	)
 	wsMessage.Payload.Data = "Container created successfully"
 	SendMessage(conn, wsMessage)
@@ -227,8 +227,8 @@ func (Cmdr *Commander) HandleStartNewContainerStream(ctx context.Context, req li
 //   - req: Command request containing container start parameters
 //   - conn: WebSocket connection for sending response
 func (Cmdr *Commander) HandleStartNewContainer(ctx context.Context, req lib.Command, conn *websocket.Conn) {
-	Params := req.Params
-	imageName := Params.StartParams.Image
+	config := req.Params.StartNewContainerConfig
+	imageName := config.Image
 	wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
 	wsMessage.Type = lib.TypeResponse
 	log.Println("Pulling image:", imageName)
@@ -240,12 +240,12 @@ func (Cmdr *Commander) HandleStartNewContainer(ctx context.Context, req lib.Comm
 	}
 
 	ExposedPorts := nat.PortSet{}
-	if Params.StartParams.ExposedPorts != 0 {
-		port := nat.Port(fmt.Sprintf("%d/%s", Params.StartParams.ExposedPorts, Params.StartParams.Protocol))
+	if config.ExposedPorts != 0 {
+		port := nat.Port(fmt.Sprintf("%d/%s", config.ExposedPorts, config.Protocol))
 		ExposedPorts[port] = struct{}{}
 	}
 
-	config := &container.Config{
+	cont_config := &container.Config{
 		Image:        imageName,
 		ExposedPorts: ExposedPorts,
 	}
@@ -254,18 +254,18 @@ func (Cmdr *Commander) HandleStartNewContainer(ctx context.Context, req lib.Comm
 			"6379/tcp": []nat.PortBinding{
 				{
 					HostIP:   "0.0.0.0",
-					HostPort: fmt.Sprintf("%d", Params.StartParams.ExposedPorts),
+					HostPort: fmt.Sprintf("%d", config.ExposedPorts),
 				},
 			},
 		},
 	}
 	resp, err := Cmdr.dockerClient.ContainerCreate(
 		ctx,
-		config,
+		cont_config,
 		hostConfig,
 		&network.NetworkingConfig{},
 		nil,
-		Params.StartParams.Name,
+		config.Name,
 	)
 	if err != nil {
 		log.Println("Container creation error:", err)
@@ -298,7 +298,11 @@ func (Cmdr *Commander) HandleStartNewContainer(ctx context.Context, req lib.Comm
 func (cmdr *Commander) HandleListContainers(ctx context.Context, req lib.Command, conn *websocket.Conn) {
 	wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
 	log.Println("Processing LIST_CONTAINERS command")
-	containers, err := cmdr.dockerClient.ContainerList(ctx, container.ListOptions{})
+	options := container.ListOptions{
+		All:  req.Params.ListContainersConfig.All,
+		Size: req.Params.ListContainersConfig.Size,
+	}
+	containers, err := cmdr.dockerClient.ContainerList(ctx, options)
 	if err != nil {
 		wsMessage.Payload.Error = err.Error()
 	}
