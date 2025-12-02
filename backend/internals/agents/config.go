@@ -11,7 +11,7 @@ type CommanderConfig struct {
 func GetDefaultCommander() *CommanderConfig {
 	DefaultCommander := CommanderConfig{
 		WsServerHOST: "localhost:8080",
-		Path:         "/agent-ws",
+		Path:         "/agent",
 		Servername:   "sentinal-agent",
 	}
 	return &DefaultCommander

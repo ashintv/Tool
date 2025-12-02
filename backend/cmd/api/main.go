@@ -55,7 +55,7 @@ func main() {
 
 		}
 
-		agent := r.Group("/agent", middlewares.MachineMiddleware())
+		agent := r.Group("/agent")
 		{
 			agent.GET("/:machine_id", wsService.Wss)
 		}

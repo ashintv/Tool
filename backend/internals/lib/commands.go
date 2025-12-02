@@ -30,8 +30,8 @@ type ListContainersConfig struct {
 }
 
 type Params struct {
-	StartNewContainerConfig StartNewContainerConfig `json:"start_params"`
-	ListContainersConfig    ListContainersConfig    `json:"list_containers_params"`
+	StartNewContainerConfig *StartNewContainerConfig `json:"start,omitempty"`
+	ListContainersConfig    *ListContainersConfig    `json:"list,omitempty"`
 	ContainerID             string                  `json:"container_id"`
 }
 

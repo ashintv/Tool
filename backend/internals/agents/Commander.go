@@ -298,9 +298,11 @@ func (Cmdr *Commander) HandleStartNewContainer(ctx context.Context, req lib.Comm
 func (cmdr *Commander) HandleListContainers(ctx context.Context, req lib.Command, conn *websocket.Conn) {
 	wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
 	log.Println("Processing LIST_CONTAINERS command")
-	options := container.ListOptions{
-		All:  req.Params.ListContainersConfig.All,
-		Size: req.Params.ListContainersConfig.Size,
+
+	options := container.ListOptions{}
+	if req.Params.ListContainersConfig != nil {
+		options.All = req.Params.ListContainersConfig.All
+		options.Size = req.Params.ListContainersConfig.Size
 	}
 	containers, err := cmdr.dockerClient.ContainerList(ctx, options)
 	if err != nil {
