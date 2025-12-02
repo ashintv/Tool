@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import type { Machine } from "@/types/types";
 import { MachineCard } from "@/components/machineCard";
+import { AddMachineModal } from "@/components/AddMachineModal";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus } from "lucide-react";
@@ -10,13 +11,15 @@ export const DashboardPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [machines, setMachines] = useState<Machine[]>([]);
   const [machineType, setMachineType] = useState<"owned" | "usable">("usable");
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   useEffect(() => {
     async function FetchMachines() {
       try {
-        const endpoint = machineType === "owned"
-          ? "http://localhost:8080/api/user/machine/owned"
-          : "http://localhost:8080/api/user/machine/usable";
+        const endpoint =
+          machineType === "owned"
+            ? "http://localhost:8080/api/user/machine/owned"
+            : "http://localhost:8080/api/user/machine/usable";
 
         const res = await axios.get(endpoint, {
           headers: {
@@ -25,11 +28,8 @@ export const DashboardPage = () => {
         });
         console.log(res.data);
         const machinesData: Machine[] = [];
-        const machinesArray = machineType === "owned"
-          ? res.data.owned_machines
-          : res.data.usable_machines;
 
-        machinesArray?.forEach((machine: any) => {
+        res.data.machines.forEach((machine: any) => {
           machinesData.push({
             id: machine.ID,
             name: machine.Name,
@@ -72,8 +72,36 @@ export const DashboardPage = () => {
   };
 
   const handleAddMachine = () => {
-    console.log("Adding new machine");
-    // TODO: Implement add machine functionality
+    setIsAddModalOpen(true);
+  };
+
+  const handleAddMachineSuccess = () => {
+    // Refresh the machines list after successful addition
+    const endpoint =
+      machineType === "owned"
+        ? "http://localhost:8080/api/user/machine/owned"
+        : "http://localhost:8080/api/user/machine/usable";
+
+    axios.get(endpoint, {
+      headers: {
+        Authorization: localStorage.getItem("token"),
+      },
+    })
+    .then(res => {
+      const machinesData: Machine[] = [];
+      res.data.machines.forEach((machine: any) => {
+        machinesData.push({
+          id: machine.ID,
+          name: machine.Name,
+          status: "online",
+          IP: machine.IP,
+        });
+      });
+      setMachines(machinesData);
+    })
+    .catch(error => {
+      console.error("Error refreshing machines:", error);
+    });
   };
 
   return (
@@ -121,6 +149,13 @@ export const DashboardPage = () => {
           </div>
         )}
       </div>
+
+      {/* Add Machine Modal */}
+      <AddMachineModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onSuccess={handleAddMachineSuccess}
+      />
     </div>
   );
 };
