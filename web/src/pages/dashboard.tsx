@@ -9,13 +9,26 @@ export const DashboardPage = () => {
   // Mock data for machines
   useEffect(() => {
     async function FetchMachines() {
-      const res = await axios.get("http://localhost:8080/api/user/machine/usable", {
-        headers: {
-          Authorization: localStorage.getItem("token"),
-        },
-      });
-      console.log(res.data);
-      setMachines(res.data.machines);
+      try {
+        const res = await axios.get("http://localhost:8080/api/user/machine/usable", {
+          headers: {
+            Authorization: localStorage.getItem("token"),
+          },
+        });
+        console.log(res.data);
+        const machinesData: Machine[] = [];
+        res.data.usable_machines.forEach((machine: any) => {
+          machinesData.push({
+            id: machine.ID,
+            name: machine.Name,
+            status: "online",
+            IP: machine.IP,
+          });
+        });
+        setMachines(machinesData);
+      } catch (error) {
+        console.error("There was an error fetching the machines!", error);
+      }
     }
     FetchMachines();
   }, []);
