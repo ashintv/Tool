@@ -40,9 +40,9 @@ func NewCommander(dockerClient *client.Client, Config *CommanderConfig) *Command
 // and continuously listening for commands from the server.
 // Parameters:
 //   - ctx: Context for cancellation and timeout handling
-func (Commader *Commander) Run(ctx context.Context) {
-	Path := Commader.Config.Path + "/" + Commader.Config.Servername
-	u := url.URL{Scheme: "ws", Host: Commader.Config.WsServerHOST, Path: Path}
+func (Cmdr *Commander) Run(ctx context.Context) {
+	Path := Cmdr.Config.Path + "/" + Cmdr.Config.Servername
+	u := url.URL{Scheme: "ws", Host: Cmdr.Config.WsServerHOST, Path: Path}
 
 	log.Println("Connecting to", u.String())
 
@@ -79,7 +79,7 @@ func (Commader *Commander) Run(ctx context.Context) {
 		switch req.CMD {
 		case lib.LIST_CONTAINERS:
 			log.Println("Processing LIST_CONTAINERS command")
-			Commader.HandleListContainers(ctx, req, conn)
+			Cmdr.HandleListContainers(ctx, req, conn)
 			continue
 		case lib.DELETE_CONTAINER:
 			log.Println("Processing DELETE_CONTAINER command for ContainerID:", req.ContainerID)
@@ -90,10 +90,10 @@ func (Commader *Commander) Run(ctx context.Context) {
 		case lib.START_NEW_CONTAINER:
 			log.Println("Processing START_CONTAINER command for ContainerID:", req.ContainerID)
 			if req.Stream {
-				Commader.HandleStartNewContainerStream(ctx, req, conn)
+				Cmdr.HandleStartNewContainerStream(ctx, req, conn)
 				continue
 			}
-			Commader.HandleStartNewContainer(ctx, req, conn)
+			Cmdr.HandleStartNewContainer(ctx, req, conn)
 			continue
 		case lib.RESTART_CONTAINER:
 			log.Println("Processing RESTART_CONTAINER command for ContainerID:", req.ContainerID)
@@ -101,7 +101,7 @@ func (Commader *Commander) Run(ctx context.Context) {
 			continue
 		case lib.START_CONTAINER:
 			log.Println("Processing START_CONTAINER command for ContainerID:", req.ContainerID)
-			Commader.HandleStartContainer(ctx, req, conn)
+			Cmdr.HandleStartContainer(ctx, req, conn)
 			continue
 
 		default:

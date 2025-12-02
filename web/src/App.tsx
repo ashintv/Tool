@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./com
 import Login from "./pages/login";
 import Signup from "./pages/signup";
 import { DashboardPage } from "./pages/dashboard";
+import { MachinePage } from "./pages/machine";
 import "./index.css";
 
 // Landing Page Component
@@ -79,6 +80,7 @@ export function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/machine/:machineId" element={<MachinePage />} />
         {/* Redirect any unknown routes to home */}
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
