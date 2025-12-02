@@ -55,62 +55,73 @@ const Login = () => {
   };
 
   return (
-    <div className="flex items-center bg-white px-20 justify-center  py-12 rounded-xl">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-light text-gray-900 mb-2">Sign In</h1>
-          <p className="text-gray-600">Enter your credentials to continue</p>
-        </div>
+    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-8">
+      <Card className="w-full max-w-md shadow-lg">
+        <CardHeader className="text-center pb-6">
+          <CardTitle className="text-3xl font-bold text-foreground mb-2">Sign In</CardTitle>
+          <CardDescription className="text-muted-foreground text-base">
+            Enter your credentials to continue
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-6 pb-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {error && (
+              <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg text-sm font-medium">
+                {error}
+              </div>
+            )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {error && <div className="border border-gray-300 text-gray-700 px-4 py-3 text-sm">{error}</div>}
+            <div className="space-y-2">
+              <Label htmlFor="username" className="text-foreground font-semibold text-sm">
+                Username
+              </Label>
+              <Input
+                id="username"
+                name="username"
+                type="text"
+                value={formData.username}
+                onChange={handleChange}
+                required
+                placeholder="Enter your username"
+                disabled={isLoading}
+                className="h-11 bg-background border-border focus:border-ring focus:ring-1 focus:ring-ring"
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="username" className="text-gray-700 font-normal">
-              Username
-            </Label>
-            <Input
-              id="username"
-              name="username"
-              type="text"
-              value={formData.username}
-              onChange={handleChange}
-              required
-              placeholder="Enter your username"
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-foreground font-semibold text-sm">
+                Password
+              </Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                value={formData.password}
+                onChange={handleChange}
+                required
+                placeholder="Enter your password"
+                disabled={isLoading}
+                className="h-11 bg-background border-border focus:border-ring focus:ring-1 focus:ring-ring"
+              />
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold mt-6"
               disabled={isLoading}
-              className="border-gray-300 focus:border-gray-500"
-            />
-          </div>
+            >
+              {isLoading ? "Signing in..." : "Sign In"}
+            </Button>
 
-          <div className="space-y-2">
-            <Label htmlFor="password" className="text-gray-700 font-normal">
-              Password
-            </Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              placeholder="Enter your password"
-              disabled={isLoading}
-              className="border-gray-300 focus:border-gray-500"
-            />
-          </div>
-
-          <Button type="submit" className="w-full bg-gray-900 hover:bg-gray-800 text-white" disabled={isLoading}>
-            {isLoading ? "Signing in..." : "Sign In"}
-          </Button>
-
-          <div className="text-center text-sm">
-            <span className="text-gray-600">Don't have an account? </span>
-            <a href="/signup" className="text-gray-900 hover:underline">
-              Sign up
-            </a>
-          </div>
-        </form>
-      </div>
+            <div className="text-center text-sm pt-2">
+              <span className="text-muted-foreground">Don't have an account? </span>
+              <a href="/signup" className="text-primary hover:text-primary/80 hover:underline font-semibold">
+                Sign up
+              </a>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 };

@@ -83,104 +83,105 @@ const Signup = () => {
   }
 
   return (
-    <div className="flex items-center bg-white px-20 justify-center  py-12 rounded-xl">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-light text-gray-900 mb-2">Create Account</h1>
-          <p className="text-gray-600">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-8">
+      <Card className="w-full max-w-md shadow-lg">
+        <CardHeader className="text-center pb-6">
+          <CardTitle className="text-3xl font-bold text-foreground mb-2">Create Account</CardTitle>
+          <CardDescription className="text-muted-foreground text-base">
             Enter your information to get started
-          </p>
-        </div>
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-6 pb-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {error && (
+              <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg text-sm font-medium">
+                {error}
+              </div>
+            )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {error && (
-            <div className="border border-gray-300 text-gray-700 px-4 py-3 text-sm">
-              {error}
+            {success && (
+              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm font-medium">
+                {success}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="username" className="text-foreground font-semibold text-sm">Username</Label>
+              <Input
+                id="username"
+                name="username"
+                type="text"
+                value={formData.username}
+                onChange={handleChange}
+                required
+                placeholder="Enter your username"
+                disabled={isLoading}
+                className="h-11 bg-background border-border focus:border-ring focus:ring-1 focus:ring-ring"
+              />
             </div>
-          )}
 
-          {success && (
-            <div className="border border-gray-300 text-gray-700 px-4 py-3 text-sm">
-              {success}
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-foreground font-semibold text-sm">Email</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                value={formData.email}
+                onChange={handleChange}
+                required
+                placeholder="Enter your email"
+                disabled={isLoading}
+                className="h-11 bg-background border-border focus:border-ring focus:ring-1 focus:ring-ring"
+              />
             </div>
-          )}
 
-          <div className="space-y-2">
-            <Label htmlFor="username" className="text-gray-700 font-normal">Username</Label>
-            <Input
-              id="username"
-              name="username"
-              type="text"
-              value={formData.username}
-              onChange={handleChange}
-              required
-              placeholder="Enter your username"
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-foreground font-semibold text-sm">Password</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                value={formData.password}
+                onChange={handleChange}
+                required
+                placeholder="Enter your password"
+                disabled={isLoading}
+                className="h-11 bg-background border-border focus:border-ring focus:ring-1 focus:ring-ring"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword" className="text-foreground font-semibold text-sm">Confirm Password</Label>
+              <Input
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                required
+                placeholder="Confirm your password"
+                disabled={isLoading}
+                className="h-11 bg-background border-border focus:border-ring focus:ring-1 focus:ring-ring"
+              />
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold mt-6"
               disabled={isLoading}
-              className="border-gray-300 focus:border-gray-500"
-            />
-          </div>
+            >
+              {isLoading ? 'Creating Account...' : 'Create Account'}
+            </Button>
 
-          <div className="space-y-2">
-            <Label htmlFor="email" className="text-gray-700 font-normal">Email</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-              placeholder="Enter your email"
-              disabled={isLoading}
-              className="border-gray-300 focus:border-gray-500"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="password" className="text-gray-700 font-normal">Password</Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              placeholder="Enter your password"
-              disabled={isLoading}
-              className="border-gray-300 focus:border-gray-500"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="confirmPassword" className="text-gray-700 font-normal">Confirm Password</Label>
-            <Input
-              id="confirmPassword"
-              name="confirmPassword"
-              type="password"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              required
-              placeholder="Confirm your password"
-              disabled={isLoading}
-              className="border-gray-300 focus:border-gray-500"
-            />
-          </div>
-
-          <Button
-            type="submit"
-            className="w-full bg-gray-900 hover:bg-gray-800 text-white"
-            disabled={isLoading}
-          >
-            {isLoading ? 'Creating Account...' : 'Create Account'}
-          </Button>
-
-          <div className="text-center text-sm">
-            <span className="text-gray-600">Already have an account? </span>
-            <a href="/login" className="text-gray-900 hover:underline">
-              Sign in
-            </a>
-          </div>
-        </form>
-      </div>
+            <div className="text-center text-sm pt-2">
+              <span className="text-muted-foreground">Already have an account? </span>
+              <a href="/login" className="text-primary hover:text-primary/80 hover:underline font-semibold">
+                Sign in
+              </a>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   )
 }

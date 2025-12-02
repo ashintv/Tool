@@ -4,7 +4,7 @@ import { Button } from "./components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
 import Login from "./pages/login";
 import Signup from "./pages/signup";
-import Dashboard from "./pages/dashboard";
+import { DashboardPage } from "./pages/dashboard";
 import "./index.css";
 
 // Landing Page Component
@@ -78,14 +78,7 @@ export function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/dashboard" element={<DashboardPage />} />
         {/* Redirect any unknown routes to home */}
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
