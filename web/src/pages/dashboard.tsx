@@ -1,37 +1,24 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import type { Machine } from "@/types/types";
 import { MachineCard } from "@/components/machineCard";
+import axios from "axios";
 
 export const DashboardPage = () => {
   const [isLoading, setIsLoading] = useState(false);
-
+  const [machines, setMachines] = useState<Machine[]>([]);
   // Mock data for machines
-  const machines: Machine[] = [
-    {
-      id: "machine-001",
-      name: "Production Server 1",
-      status: "online",
-      ipAddress: "192.168.1.100"
-    },
-    {
-      id: "machine-002",
-      name: "Development Server",
-      status: "offline",
-      ipAddress: "192.168.1.101"
-    },
-    {
-      id: "machine-003",
-      name: "Database Server",
-      status: "online",
-      ipAddress: "192.168.1.102"
-    },
-    {
-      id: "machine-004",
-      name: "Testing Environment",
-      status: "offline",
-      ipAddress: "192.168.1.103"
+  useEffect(() => {
+    async function FetchMachines() {
+      const res = await axios.get("http://localhost:8080/api/user/machine/usable", {
+        headers: {
+          Authorization: localStorage.getItem("token"),
+        },
+      });
+      console.log(res.data);
+      setMachines(res.data.machines);
     }
-  ];
+    FetchMachines();
+  }, []);
 
   const handleConnect = (machine: Machine) => {
     console.log(`Connecting to machine: ${machine.name}`);
@@ -89,7 +76,4 @@ export const DashboardPage = () => {
       </div>
     </div>
   );
-}
-
-
-
+};

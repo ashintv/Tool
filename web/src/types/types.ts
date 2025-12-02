@@ -2,6 +2,6 @@ export interface Machine {
     id: string;
     name: string;
     status: "online" | "offline";
-    ipAddress: string;
+    IP: string;
     // CREATE SOME MOCK DATA HERE
 }

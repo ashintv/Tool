@@ -20,7 +20,7 @@ export function MachineCard({
   isLoading = false,
   className = ""
 }: MachineCardProps) {
-  const isOnline = machine.status === "online";
+  const isOnline = true;
 
   return (
     <div className={`bg-card border border-border rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow ${className}`}>
@@ -43,7 +43,7 @@ export function MachineCard({
             <span className="font-medium text-card-foreground">Machine ID:</span> {machine.id}
           </div>
           <div className="text-sm text-muted-foreground">
-            <span className="font-medium text-card-foreground">IP Address:</span> {machine.ipAddress}
+            <span className="font-medium text-card-foreground">IP Address:</span> {machine.IP}
           </div>
         </div>
 

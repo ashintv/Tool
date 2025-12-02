@@ -29,7 +29,6 @@ func UserMiddleware() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-
 		c.Set("user_id", claims["user_id"])
 		c.Next()
 	}

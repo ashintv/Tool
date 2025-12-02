@@ -1,7 +1,6 @@
 package handlers
 
 import (
-
 	"aetrix/observer/internals/models"
 	"fmt"
 	"strconv"
@@ -70,7 +69,7 @@ func (h *MachineHandler) RegisterMachine(ctx *gin.Context) {
 
 // list machine created by a particular user
 func (h *MachineHandler) ListMachinesOfUser(ctx *gin.Context) {
-	UserId := ctx.MustGet("user_id").(uint)
+	UserId := ctx.MustGet("user_id")
 	var machines []models.Machine
 	err := h.db.Where("creator_id = ?", UserId).Preload("Users").Find(&machines).Error
 	if err != nil {
@@ -82,17 +81,29 @@ func (h *MachineHandler) ListMachinesOfUser(ctx *gin.Context) {
 }
 
 func (h *MachineHandler) ListUsableMachine(ctx *gin.Context) {
-	UserId := ctx.MustGet("user_id").(uint)
-	var User models.User
-	err := h.db.Where("id = ?", UserId).Preload("machines").Find(&User).Error
+	userId := ctx.MustGet("user_id")
+
+	var user models.User
+
+	err := h.db.
+		Where("id = ?", userId).
+		Preload("Machines"). // MUST match struct field name
+		Preload("Machines.Users", func(db *gorm.DB) *gorm.DB {
+			return db.Omit("password")
+		}).
+		First(&user).Error
+
 	if err != nil {
 		ctx.JSON(400, gin.H{
-			"message": "error while fetching data ",
+			"message": "error while fetching data",
 			"err":     err.Error(),
 		})
 		return
 	}
 
+	ctx.JSON(200, gin.H{
+		"usable_machines": user.Machines,
+	})
 }
 
 func (h *MachineHandler) GetMachine(ctx *gin.Context) {
@@ -188,7 +199,7 @@ func (h *MachineHandler) DeleteMachine(ctx *gin.Context) {
 	ctx.JSON(200, gin.H{
 		"message": "machine deleted successfully",
 	})
-	
+
 }
 
 func (h *MachineHandler) AddUser(ctx *gin.Context) {
