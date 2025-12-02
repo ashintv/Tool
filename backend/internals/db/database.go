@@ -24,6 +24,9 @@ func InitializeDB() *gorm.DB {
 	if err != nil {
 		log.Fatalf("❌ Failed to migrate models: %v", err)
 	}
+	// Seed initial data
+	Seed(db)
+	
 	log.Println("✅ Connected to PostgreSQL & Migrated")
 	return db
 }
