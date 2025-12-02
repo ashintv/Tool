@@ -74,10 +74,14 @@ func (h *MachineHandler) ListMachinesOfUser(ctx *gin.Context) {
 	err := h.db.Where("creator_id = ?", UserId).Preload("Users").Find(&machines).Error
 	if err != nil {
 		ctx.JSON(400, gin.H{
-			"message": "data retrieved ",
-			"data":    machines,
+			"message":  "failed to fetch",
+			"machines": machines,
 		})
 	}
+
+	ctx.JSON(200, gin.H{
+		"machines": machines,
+	})
 }
 
 func (h *MachineHandler) ListUsableMachine(ctx *gin.Context) {
@@ -102,7 +106,7 @@ func (h *MachineHandler) ListUsableMachine(ctx *gin.Context) {
 	}
 
 	ctx.JSON(200, gin.H{
-		"usable_machines": user.Machines,
+		"machines": user.Machines,
 	})
 }
 
