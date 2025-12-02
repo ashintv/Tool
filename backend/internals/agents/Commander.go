@@ -324,6 +324,7 @@ func (cmdr *Commander) HandleListContainers(ctx context.Context, req lib.Command
 	}
 }
 
+
 // HandleDeleteContainer removes a Docker container by its ID.
 // It forcefully removes the container and sends a confirmation message
 // through the WebSocket connection.
