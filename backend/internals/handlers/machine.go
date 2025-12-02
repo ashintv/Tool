@@ -34,35 +34,41 @@ type UserEditRequest struct {
 }
 
 func (h *MachineHandler) RegisterMachine(ctx *gin.Context) {
-	CreatorID := ctx.MustGet("user_id").(uint)
+	// Extract user_id as uint
+	val := ctx.MustGet("user_id")
+	creatorID := uint(val.(float64)) // SAFE
+
 	var req RegisterMachineRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(404, gin.H{
+		ctx.JSON(400, gin.H{
 			"message": "invalid data",
-			"error":   err,
+			"error":   err.Error(),
 		})
 		return
 	}
 
-	// check and add users
+	// Fetch valid users only
 	var users []models.User
 	if err := h.db.Where("id IN ?", req.Users).Find(&users).Error; err != nil {
-		ctx.JSON(500, gin.H{"error": "DB error"})
+		ctx.JSON(500, gin.H{"error": "DB error: " + err.Error()})
 		return
 	}
 
-	// create database entry
+	// Create machine entry
 	machine := models.Machine{
 		Name:      req.Name,
-		CreatorID: uint(CreatorID),
+		CreatorID: creatorID, // ✔ CORRECT FIELD
 		IP:        req.IP,
 		Users:     users,
 	}
-	h.db.Create(&machine)
 
-	//send response
+	if err := h.db.Create(&machine).Error; err != nil {
+		ctx.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
 	ctx.JSON(200, gin.H{
-		"message": "user",
+		"message": "machine created successfully",
 		"id":      machine.ID,
 	})
 }

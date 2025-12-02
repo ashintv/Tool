@@ -25,14 +25,11 @@ interface AddMachineModalProps {
   onSuccess: () => void;
 }
 
+//TOD)O: Replace mock data with API call to fetch users
+// FOR now for showing we will go with created machine only
 // Mock user data - replace with API call in the future
 const mockUsers: User[] = [
-  { id: 1, name: "John Doe", email: "john.doe@example.com", role: "Admin" },
-  { id: 2, name: "Jane Smith", email: "jane.smith@example.com", role: "Developer" },
-  { id: 3, name: "Mike Johnson", email: "mike.johnson@example.com", role: "DevOps" },
-  { id: 4, name: "Sarah Wilson", email: "sarah.wilson@example.com", role: "Developer" },
-  { id: 5, name: "David Brown", email: "david.brown@example.com", role: "Manager" },
-  { id: 6, name: "Lisa Davis", email: "lisa.davis@example.com", role: "QA Engineer" },
+
 ];
 
 export const AddMachineModal: React.FC<AddMachineModalProps> = ({ isOpen, onClose, onSuccess }) => {
@@ -49,7 +46,7 @@ export const AddMachineModal: React.FC<AddMachineModalProps> = ({ isOpen, onClos
   if (!isOpen) return null;
 
   const handleInputChange = (field: keyof RegisterMachineRequest, value: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [field]: value,
     }));
@@ -57,16 +54,16 @@ export const AddMachineModal: React.FC<AddMachineModalProps> = ({ isOpen, onClos
 
   const handleUserSelect = (userId: number) => {
     if (selectedUsers.includes(userId)) {
-      const newSelectedUsers = selectedUsers.filter(id => id !== userId);
+      const newSelectedUsers = selectedUsers.filter((id) => id !== userId);
       setSelectedUsers(newSelectedUsers);
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         users: newSelectedUsers,
       }));
     } else {
       const newSelectedUsers = [...selectedUsers, userId];
       setSelectedUsers(newSelectedUsers);
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         users: newSelectedUsers,
       }));
@@ -75,20 +72,21 @@ export const AddMachineModal: React.FC<AddMachineModalProps> = ({ isOpen, onClos
 
   const getSelectedUserNames = () => {
     return selectedUsers
-      .map(userId => mockUsers.find(user => user.id === userId)?.name)
+      .map((userId) => mockUsers.find((user) => user.id === userId)?.name)
       .filter(Boolean)
       .join(", ");
   };
 
-  const filteredUsers = mockUsers.filter(user =>
-    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredUsers = mockUsers.filter(
+    (user) =>
+      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const removeUser = (userId: number) => {
-    const newSelectedUsers = selectedUsers.filter(id => id !== userId);
+    const newSelectedUsers = selectedUsers.filter((id) => id !== userId);
     setSelectedUsers(newSelectedUsers);
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       users: newSelectedUsers,
     }));
@@ -96,7 +94,7 @@ export const AddMachineModal: React.FC<AddMachineModalProps> = ({ isOpen, onClos
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.ip || formData.users.length === 0) {
+    if (!formData.name || !formData.ip) {
       alert("Please fill in all required fields");
       return;
     }
@@ -104,8 +102,12 @@ export const AddMachineModal: React.FC<AddMachineModalProps> = ({ isOpen, onClos
     setIsSubmitting(true);
     try {
       const response = await axios.post(
-        "http://localhost:8080/api/user/machine/register",
-        formData,
+        "http://localhost:8080/api/user/machine",
+        {
+          //FIX: proper user management
+          ...formData,
+          users: [],
+        },
         {
           headers: {
             Authorization: localStorage.getItem("token"),
@@ -153,12 +155,7 @@ export const AddMachineModal: React.FC<AddMachineModalProps> = ({ isOpen, onClos
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <h2 className="text-lg font-semibold">Add New Machine</h2>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleClose}
-            className="h-6 w-6"
-          >
+          <Button variant="ghost" size="icon" onClick={handleClose} className="h-6 w-6">
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -196,9 +193,12 @@ export const AddMachineModal: React.FC<AddMachineModalProps> = ({ isOpen, onClos
             {selectedUsers.length > 0 && (
               <div className="flex flex-wrap gap-2 p-2 border rounded-md bg-muted/50">
                 {selectedUsers.map((userId) => {
-                  const user = mockUsers.find(u => u.id === userId);
+                  const user = mockUsers.find((u) => u.id === userId);
                   return user ? (
-                    <div key={userId} className="flex items-center gap-1 bg-primary text-primary-foreground px-2 py-1 rounded-md text-sm">
+                    <div
+                      key={userId}
+                      className="flex items-center gap-1 bg-primary text-primary-foreground px-2 py-1 rounded-md text-sm"
+                    >
                       <span>{user.name}</span>
                       <button
                         type="button"
@@ -238,9 +238,7 @@ export const AddMachineModal: React.FC<AddMachineModalProps> = ({ isOpen, onClos
               {isDropdownOpen && (
                 <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-y-auto">
                   {filteredUsers.length === 0 ? (
-                    <div className="p-3 text-sm text-muted-foreground text-center">
-                      No users found
-                    </div>
+                    <div className="p-3 text-sm text-muted-foreground text-center">No users found</div>
                   ) : (
                     filteredUsers.map((user) => (
                       <div
@@ -277,18 +275,10 @@ export const AddMachineModal: React.FC<AddMachineModalProps> = ({ isOpen, onClos
 
           {/* Actions */}
           <div className="flex justify-end gap-3 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleClose}
-              disabled={isSubmitting}
-            >
+            <Button type="button" variant="outline" onClick={handleClose} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-            >
+            <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Adding..." : "Add Machine"}
             </Button>
           </div>
