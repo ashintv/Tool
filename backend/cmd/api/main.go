@@ -4,14 +4,14 @@ import (
 	"aetrix/observer/internals/db"
 	"aetrix/observer/internals/handlers"
 	"aetrix/observer/internals/middlewares"
-	"log"
-
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"log"
 )
 
 func main() {
 	r := gin.Default()
-
+	r.Use(cors.Default())
 	wsService := handlers.NewWebsocketService()
 	CommandHandler := handlers.NewCommandHandler(wsService)
 	database := db.InitializeDB()

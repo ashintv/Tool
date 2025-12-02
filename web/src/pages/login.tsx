@@ -3,6 +3,8 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -11,7 +13,7 @@ const Login = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-
+  const navigate = useNavigate()
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
       ...formData,
@@ -25,30 +27,14 @@ const Login = () => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
-
+    //TODO: proper errormessage should be shown
     try {
-      const response = await fetch("/api/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        // Store token in localStorage
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("user_id", data.user_id);
-
-        // Redirect to dashboard or home page
-        window.location.href = "/dashboard";
-      } else {
-        setError(data.error || "Login failed");
-      }
+      const res = await axios.post("http://localhost:8080/api/auth/user/login", formData);
+      console.log(res.data);
+      localStorage.setItem("token", res.data.token);
+      navigate("/dashboard")
     } catch (err) {
-      setError("Network error. Please try again.");
+      setError("Failed to login");
     } finally {
       setIsLoading(false);
     }

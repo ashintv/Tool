@@ -3,6 +3,7 @@ package handlers
 import (
 	"aetrix/observer/internals/lib"
 	"aetrix/observer/internals/models"
+	"fmt"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -98,6 +99,8 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 // Returns 400 for validation errors, 401 for invalid credentials, or 500 for token generation errors.
 func (h *UserHandler) Login(c *gin.Context) {
 	var req LoginRequest
+
+	fmt.Println("Request recieved")
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
