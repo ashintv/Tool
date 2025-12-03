@@ -7,8 +7,8 @@ import "github.com/gorilla/websocket"
 type WatchdogService struct {
 	Containers map[string]string  // containers to watch
 	Interval    int                // check interval in seconds
-	Notify      func() 
-	conn 		*websocket.Conn            // alert configurations 	
+	Notify      func()
+	conn 		*websocket.Conn            // alert configurations
 }
 
 

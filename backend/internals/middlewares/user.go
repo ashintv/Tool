@@ -1,14 +1,23 @@
 package middlewares
 
 import (
+	"aetrix/observer/internals/config"
 	"aetrix/observer/internals/lib"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
 
+type userMiddleware struct {
+	cnf *config.Config
+}
 
-func UserMiddleware() gin.HandlerFunc {
+func NewUserMiddleware(cnf *config.Config) *userMiddleware {
+	return &userMiddleware{
+		cnf: cnf,
+	}
+}
+func (m *userMiddleware) UserMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenString := c.GetHeader("Authorization")
 		if tokenString == "" {
@@ -17,7 +26,7 @@ func UserMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		token, err := lib.ParseToken(tokenString , lib.USER_JWT_SECRET)
+		token, err := lib.ParseToken(tokenString, []byte(m.cnf.USER_JWT_SECRET))
 		if err != nil || !token.Valid {
 			c.JSON(401, gin.H{"error": "Invalid or expired token"})
 			c.Abort()

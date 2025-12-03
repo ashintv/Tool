@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"aetrix/observer/internals/config"
 	"aetrix/observer/internals/lib"
 	"aetrix/observer/internals/models"
 	"fmt"
@@ -12,13 +13,17 @@ import (
 // UserHandler handles all user-related HTTP requests and database operations.
 // It contains a database connection for performing CRUD operations on user entities.
 type UserHandler struct {
-	DB *gorm.DB
+	DB  *gorm.DB
+	cnf config.Config
 }
 
 // NewUserHandler creates and returns a new instance of UserHandler with the provided database connection.
 // This is the constructor function for UserHandler.
-func NewUserHandler(db *gorm.DB) *UserHandler {
-	return &UserHandler{DB: db}
+func NewUserHandler(db *gorm.DB, cnf *config.Config) *UserHandler {
+	return &UserHandler{
+		DB:  db,
+		cnf: *cnf,
+	}
 }
 
 // SignupRequest represents the request payload for user registration.
@@ -112,7 +117,7 @@ func (h *UserHandler) Login(c *gin.Context) {
 		return
 	}
 
-	token, err := lib.GenerateToken(user.ID, lib.USER_JWT_SECRET) // Implement this function to generate JWT token
+	token, err := lib.GenerateToken(user.ID, []byte(h.cnf.USER_JWT_SECRET)) // Implement this function to generate JWT token
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Failed to generate token"})
 		return

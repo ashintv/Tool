@@ -6,9 +6,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-	
-var MACHINE_JWT_SECRET = []byte("your_secret_key") 
-var USER_JWT_SECRET = []byte("your_user_secret_key")
+
 
 func GenerateToken(userID uint , JWT_SECRET []byte) (string, error) {
     claims := jwt.MapClaims{
