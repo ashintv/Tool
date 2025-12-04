@@ -1,6 +1,10 @@
 package config
 
 import (
+	"fmt"
+	"log"
+	"os"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -26,8 +30,9 @@ var methods = []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"}
 
 func LoadConfig() *Config {
 	Env := gin.Mode()
+	log.Println("\n-----------", Env, "----------")
+	fmt.Print("\n\n")
 	if Env != gin.ReleaseMode {
-
 		// dev mode return developer config
 		return &Config{
 			AllowOriginFunc: func(origin string) bool {
@@ -44,7 +49,22 @@ func LoadConfig() *Config {
 		}
 	}
 	var Cnf Config
-	// add a function for validate data
+
+	Cnf.AllowOriginFunc = func(origin string) bool {
+		return true // allow ALL origins
+	}
+
+	Cnf.AllowMethods = methods
+	Cnf.AllowHeaders = []string{"*"}
+	Cnf.ExposeHeaders = []string{"*"}
+	Cnf.AllowCredentials = true
+
+	Port := os.Getenv("PORT")
+	if Port == "" {
+	
+		Port = "8080"
+	}
+	Cnf.Port =
 	return &Cnf
 
 }
