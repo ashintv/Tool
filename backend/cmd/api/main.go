@@ -5,6 +5,7 @@ import (
 	"aetrix/observer/internals/db"
 	"aetrix/observer/internals/handlers"
 	"aetrix/observer/internals/middlewares"
+	"aetrix/observer/internals/services"
 	"log"
 
 	"github.com/gin-contrib/cors"
@@ -13,7 +14,8 @@ import (
 
 func main() {
 	r := gin.Default()
-	cnf := config.LoadConfig()
+	logger := services.GetLogger()
+	cnf := config.LoadConfig(logger)
 	r.Use(cors.New(cors.Config{
 		AllowOriginFunc: func(origin string) bool {
 			return true // allow ALL origins
