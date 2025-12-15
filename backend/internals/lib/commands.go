@@ -15,8 +15,6 @@ const (
 	START_CONTAINER     = "start_container"
 )
 
-
-
 // StartNewContainerConfig defines configuration
 // required to create and start a new Docker container
 type StartNewContainerConfig struct {
@@ -47,17 +45,25 @@ type StartNewContainerConfig struct {
 	Name string `json:"name" binding:"required"`
 }
 
-
-
+type DeleteContainerConfig struct {
+	// force delete container even if running or forced removal
+	// dfault: true
+	Force  bool `json:"force"`
+	// remove associated volumes
+	Volume bool `json:"volume"`
+	// remove associated network
+	Links  bool `json:"links"`
+}
 type ListContainersConfig struct {
 	Size bool `json:"size"`
 	All  bool `json:"all"`
 }
 
 type Params struct {
+	DeleteContainerConfig  *DeleteContainerConfig  `json:"delete,omitempty"`
 	StartNewContainerConfig *StartNewContainerConfig `json:"start,omitempty"`
 	ListContainersConfig    *ListContainersConfig    `json:"list,omitempty"`
-	ContainerID             string                  `json:"container_id"`
+	ContainerID             string                   `json:"container_id"`
 }
 
 // TODO: replace

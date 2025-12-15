@@ -83,7 +83,7 @@ func (Cmdr *Commander) Run(ctx context.Context) {
 			continue
 		case lib.DELETE_CONTAINER:
 			log.Println("Processing DELETE_CONTAINER command for ContainerID:", req.ContainerID)
-			// Add logic to delete the specified container
+			Cmdr.HandleDeleteContainer(ctx, req, conn)
 		case lib.STOP_CONTAINER:
 			log.Println("Processing STOP_CONTAINER command for ContainerID:", req.ContainerID)
 			Cmdr.HandleStopContainer(ctx, req, conn)
@@ -340,8 +340,17 @@ func (cmdr *Commander) HandleListContainers(ctx context.Context, req lib.Command
 //   - conn: WebSocket connection for sending deletion response
 func (cmdr *Commander) HandleDeleteContainer(ctx context.Context, req lib.Command, conn *websocket.Conn) {
 	wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
+	configs := req.Params.DeleteContainerConfig
 	log.Println("Processing DELETE_CONTAINER command for ContainerID:", req.ContainerID)
-	err := cmdr.dockerClient.ContainerRemove(ctx, req.ContainerID, container.RemoveOptions{Force: true})
+	options := container.RemoveOptions{}
+	if configs != nil {
+		options.Force = configs.Force
+		options.RemoveVolumes = configs.Volume
+		options.RemoveLinks = configs.Links
+	} else {
+		options.Force = true
+	}
+	err := cmdr.dockerClient.ContainerRemove(ctx, req.ContainerID, options)
 	if err != nil {
 		wsMessage.Payload.Error = err.Error()
 	} else {
