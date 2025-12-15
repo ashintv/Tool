@@ -87,18 +87,18 @@ func (Cmdr *Commander) Run(ctx context.Context) {
 		case lib.STOP_CONTAINER:
 			log.Println("Processing STOP_CONTAINER command for ContainerID:", req.ContainerID)
 			Cmdr.HandleStopContainer(ctx, req, conn)
-			// Add logic to stop the specified container
+
 		case lib.START_NEW_CONTAINER:
 			log.Println("Processing START_CONTAINER command for ContainerID:", req.ContainerID)
-			if req.Stream {
-				// Cmdr.HandleStartNewContainerStream(ctx, req, conn)
-				continue
-			}
+			// if req.Stream {
+			// 	// Cmdr.HandleStartNewContainerStream(ctx, req, conn)
+			// 	continue
+			// }
 			Cmdr.HandleStartNewContainer(ctx, req, conn)
 			continue
 		case lib.RESTART_CONTAINER:
 			log.Println("Processing RESTART_CONTAINER command for ContainerID:", req.ContainerID)
-			// Add logic to restart the specified containee :
+			// Add logic to restart the specified container :
 			continue
 		case lib.START_CONTAINER:
 			log.Println("Processing START_CONTAINER command for ContainerID:", req.ContainerID)
