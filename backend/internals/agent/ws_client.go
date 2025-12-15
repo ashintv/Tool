@@ -1,4 +1,3 @@
-// interface for websocket client interactions
 package agents
 
 import (
@@ -10,6 +9,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// WSClientInterface defines the contract for websocket client interactions.
 type WSClientInterface interface {
 	Connect() error
 	Send(msg lib.WsMessage) error
@@ -17,6 +17,7 @@ type WSClientInterface interface {
 	Close() error
 }
 
+// WSClient manages WebSocket connections for the agent, handling connection lifecycle and message routing.
 type WSClient struct {
 	host       string
 	path       string
@@ -24,6 +25,7 @@ type WSClient struct {
 	conn       *websocket.Conn
 }
 
+// NewWSClient creates and returns a new WSClient instance with the specified connection parameters.
 func NewWSClient(host, path, clientName string) *WSClient {
 	return &WSClient{
 		host:       host,
@@ -32,6 +34,8 @@ func NewWSClient(host, path, clientName string) *WSClient {
 	}
 }
 
+// Connect establishes a WebSocket connection to the configured server.
+// It returns an error if the connection fails.
 func (c *WSClient) Connect() error {
 	u := url.URL{
 		Scheme: "ws",
@@ -49,6 +53,8 @@ func (c *WSClient) Connect() error {
 	return nil
 }
 
+// Send marshals and transmits a WsMessage over the WebSocket connection.
+// It returns an error if marshaling or sending fails.
 func (c *WSClient) Send(msg lib.WsMessage) error {
 	data, err := json.Marshal(msg)
 	if err != nil {
@@ -57,6 +63,8 @@ func (c *WSClient) Send(msg lib.WsMessage) error {
 	return c.conn.WriteMessage(websocket.TextMessage, data)
 }
 
+// Receive continuously reads messages from the WebSocket connection and invokes the provided handler function.
+// It blocks until the connection is closed or an error occurs.
 func (c *WSClient) Receive(handler func(lib.Command)) {
 	for {
 		_, data, err := c.conn.ReadMessage()
@@ -73,6 +81,8 @@ func (c *WSClient) Receive(handler func(lib.Command)) {
 	}
 }
 
+// Close gracefully closes the WebSocket connection if it exists.
+// It returns nil if the connection is already closed or an error if closing fails.
 func (c *WSClient) Close() error {
 	if c.conn != nil {
 		return c.conn.Close()
