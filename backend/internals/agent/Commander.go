@@ -16,10 +16,17 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/gorilla/websocket"
 )
+// interface for sending messages, to allow mocking in tests
+type MessageSender interface {
+	Send(conn *websocket.Conn, message lib.WsMessage)
+}
+type WebSocketSender struct{}
+
 
 type Commander struct {
-	dockerClient *client.Client
+	dockerClient DockerClient
 	Config       CommanderConfig
+	sender       MessageSender
 }
 
 // NewCommander creates a new Commander instance with the provided Docker client and configuration.

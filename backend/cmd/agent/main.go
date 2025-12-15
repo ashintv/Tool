@@ -1,7 +1,7 @@
 package main
 
 import (
-	"aetrix/observer/internals/agents"
+	"aetrix/observer/internals/agent"
 	"context"
 
 	"github.com/docker/docker/client"
