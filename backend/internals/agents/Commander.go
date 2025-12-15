@@ -90,7 +90,7 @@ func (Cmdr *Commander) Run(ctx context.Context) {
 		case lib.START_NEW_CONTAINER:
 			log.Println("Processing START_CONTAINER command for ContainerID:", req.ContainerID)
 			if req.Stream {
-				Cmdr.HandleStartNewContainerStream(ctx, req, conn)
+				// Cmdr.HandleStartNewContainerStream(ctx, req, conn)
 				continue
 			}
 			Cmdr.HandleStartNewContainer(ctx, req, conn)
@@ -137,87 +137,87 @@ func SendMessage(conn *websocket.Conn, message lib.WsMessage) {
 //   - ctx: Context for cancellation and timeout handling
 //   - req: Command request containing container start parameters
 //   - conn: WebSocket connection for streaming progress updates
-func (Cmdr *Commander) HandleStartNewContainerStream(ctx context.Context, req lib.Command, conn *websocket.Conn) {
-	configs := req.Params.StartNewContainerConfig
-	imageName := configs.Image
-	wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
-	wsMessage.Payload.Data = "Starting container with image: " + imageName
-	wsMessage.Type = lib.TypeStream
-	SendMessage(conn, wsMessage)
-	log.Println("Pulling image:", imageName)
-	stream, err := Cmdr.dockerClient.ImagePull(ctx, imageName, image.PullOptions{})
-	if err != nil {
-		wsMessage.Payload.Error = err.Error()
-		wsMessage.Type = lib.TypeStreamEnd
-		SendMessage(conn, wsMessage)
-		return
-	}
-	buffer := make([]byte, 1024)
-	for {
-		n, err := stream.Read(buffer)
-		if err != nil {
-			break
-		}
-		wsMessage.Type = lib.TypeStream
-		wsMessage.Payload.Data = string(buffer[:n])
-		SendMessage(conn, wsMessage)
-	}
-	wsMessage.Payload.Data = "Image pulled successfully"
-	SendMessage(conn, wsMessage)
+// func (Cmdr *Commander) HandleStartNewContainerStream(ctx context.Context, req lib.Command, conn *websocket.Conn) {
+// 	configs := req.Params.StartNewContainerConfig
+// 	imageName := configs.Image
+// 	wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
+// 	wsMessage.Payload.Data = "Starting container with image: " + imageName
+// 	wsMessage.Type = lib.TypeStream
+// 	SendMessage(conn, wsMessage)
+// 	log.Println("Pulling image:", imageName)
+// 	stream, err := Cmdr.dockerClient.ImagePull(ctx, imageName, image.PullOptions{})
+// 	if err != nil {
+// 		wsMessage.Payload.Error = err.Error()
+// 		wsMessage.Type = lib.TypeStreamEnd
+// 		SendMessage(conn, wsMessage)
+// 		return
+// 	}
+// 	buffer := make([]byte, 1024)
+// 	for {
+// 		n, err := stream.Read(buffer)
+// 		if err != nil {
+// 			break
+// 		}
+// 		wsMessage.Type = lib.TypeStream
+// 		wsMessage.Payload.Data = string(buffer[:n])
+// 		SendMessage(conn, wsMessage)
+// 	}
+// 	wsMessage.Payload.Data = "Image pulled successfully"
+// 	SendMessage(conn, wsMessage)
 
-	ExposedPorts := nat.PortSet{}
-	if configs.ExposedPorts != 0 {
-		port := nat.Port(fmt.Sprintf("%d/%s", configs.ExposedPorts, configs.Protocol))
-		ExposedPorts[port] = struct{}{}
-	}
-	config := &container.Config{
-		Image:        imageName,
-		ExposedPorts: ExposedPorts,
-	}
-	hostConfig := &container.HostConfig{
-		PortBindings: nat.PortMap{
-			nat.Port(configs.HostPort): []nat.PortBinding{
-				{
-					HostIP:   "0.0.0.0",
-					HostPort: fmt.Sprintf("%d", configs.ExposedPorts),
-				},
-			},
-		},
-	}
-	wsMessage.Payload.Data = "Config set successfully"
-	SendMessage(conn, wsMessage)
-	resp, err := Cmdr.dockerClient.ContainerCreate(
-		ctx,
-		config,
-		hostConfig,
-		&network.NetworkingConfig{},
-		nil,
-		configs.Name,
-	)
-	wsMessage.Payload.Data = "Container created successfully"
-	SendMessage(conn, wsMessage)
-	if err != nil {
-		log.Println("Container creation error:", err)
-		wsMessage.Payload.Error = err.Error()
-		wsMessage.Type = lib.TypeStreamEnd
-		SendMessage(conn, wsMessage)
-		return
-	}
+// 	ExposedPorts := nat.PortSet{}
+// 	if configs.ExposedPorts != 0 {
+// 		port := nat.Port(fmt.Sprintf("%d/%s", configs.ExposedPorts, configs.Protocol))
+// 		ExposedPorts[port] = struct{}{}
+// 	}
+// 	config := &container.Config{
+// 		Image:        imageName,
+// 		ExposedPorts: ExposedPorts,
+// 	}
+// 	hostConfig := &container.HostConfig{
+// 		PortBindings: nat.PortMap{
+// 			nat.Port(configs.HostPort): []nat.PortBinding{
+// 				{
+// 					HostIP:   "0.0.0.0",
+// 					HostPort: fmt.Sprintf("%d", configs.ExposedPorts),
+// 				},
+// 			},
+// 		},
+// 	}
+// 	wsMessage.Payload.Data = "Config set successfully"
+// 	SendMessage(conn, wsMessage)
+// 	resp, err := Cmdr.dockerClient.ContainerCreate(
+// 		ctx,
+// 		config,
+// 		hostConfig,
+// 		&network.NetworkingConfig{},
+// 		nil,
+// 		configs.Name,
+// 	)
+// 	wsMessage.Payload.Data = "Container created successfully"
+// 	SendMessage(conn, wsMessage)
+// 	if err != nil {
+// 		log.Println("Container creation error:", err)
+// 		wsMessage.Payload.Error = err.Error()
+// 		wsMessage.Type = lib.TypeStreamEnd
+// 		SendMessage(conn, wsMessage)
+// 		return
+// 	}
 
-	// 4. Start the container
-	if err := Cmdr.dockerClient.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
-		log.Println("Container start error:", err)
-		wsMessage.Payload.Error = err.Error()
-		wsMessage.Type = lib.TypeStreamEnd
-		SendMessage(conn, wsMessage)
-		return
-	}
+// 	// 4. Start the container
+// 	if err := Cmdr.dockerClient.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+// 		log.Println("Container start error:", err)
+// 		wsMessage.Payload.Error = err.Error()
+// 		wsMessage.Type = lib.TypeStreamEnd
+// 		SendMessage(conn, wsMessage)
+// 		return
+// 	}
 
-	wsMessage.Payload.Data = "Container started successfully with ID: " + resp.ID
-	wsMessage.Type = lib.TypeStreamEnd
-	SendMessage(conn, wsMessage)
+// 	wsMessage.Payload.Data = "Container started successfully with ID: " + resp.ID
+// 	wsMessage.Type = lib.TypeStreamEnd
+// 	SendMessage(conn, wsMessage)
 
-}
+// }
 
 // HandleStartNewContainer handles starting a new Docker container without streaming.
 // It pulls the specified image, creates and starts the container, sending a single
@@ -227,8 +227,8 @@ func (Cmdr *Commander) HandleStartNewContainerStream(ctx context.Context, req li
 //   - req: Command request containing container start parameters
 //   - conn: WebSocket connection for sending response
 func (Cmdr *Commander) HandleStartNewContainer(ctx context.Context, req lib.Command, conn *websocket.Conn) {
-	config := req.Params.StartNewContainerConfig
-	imageName := config.Image
+	StartConfig := req.Params.StartNewContainerConfig
+	imageName := StartConfig.Image
 	wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
 	wsMessage.Type = lib.TypeResponse
 	log.Println("Pulling image:", imageName)
@@ -238,35 +238,40 @@ func (Cmdr *Commander) HandleStartNewContainer(ctx context.Context, req lib.Comm
 		SendMessage(conn, wsMessage)
 		return
 	}
-
-	ExposedPorts := nat.PortSet{}
-	if config.ExposedPorts != 0 {
-		port := nat.Port(fmt.Sprintf("%d/%s", config.ExposedPorts, config.Protocol))
-		ExposedPorts[port] = struct{}{}
+	if StartConfig.Protocol == "" {
+		StartConfig.Protocol = "tcp"
 	}
+	if StartConfig.HostIP == "" {
+		StartConfig.HostIP = "0.0.0.0"
+	}
+
+	ContainerPort := nat.Port(fmt.Sprintf("%d/%s", StartConfig.ContainerPort, StartConfig.Protocol))
 
 	cont_config := &container.Config{
 		Image:        imageName,
-		ExposedPorts: ExposedPorts,
+		ExposedPorts: nat.PortSet{ContainerPort: struct{}{}},
 	}
+
 	hostConfig := &container.HostConfig{
 		PortBindings: nat.PortMap{
-			"6379/tcp": []nat.PortBinding{
+			ContainerPort: []nat.PortBinding{
 				{
-					HostIP:   "0.0.0.0",
-					HostPort: fmt.Sprintf("%d", config.ExposedPorts),
+					HostIP:   StartConfig.HostIP,
+					HostPort: fmt.Sprintf("%d", StartConfig.HostPort),
 				},
 			},
 		},
 	}
+
 	resp, err := Cmdr.dockerClient.ContainerCreate(
 		ctx,
 		cont_config,
 		hostConfig,
 		&network.NetworkingConfig{},
 		nil,
-		config.Name,
+		StartConfig.Name,
 	)
+
 	if err != nil {
 		log.Println("Container creation error:", err)
 		wsMessage.Payload.Error = err.Error()
@@ -304,6 +309,7 @@ func (cmdr *Commander) HandleListContainers(ctx context.Context, req lib.Command
 		options.All = req.Params.ListContainersConfig.All
 		options.Size = req.Params.ListContainersConfig.Size
 	}
+
 	containers, err := cmdr.dockerClient.ContainerList(ctx, options)
 	if err != nil {
 		wsMessage.Payload.Error = err.Error()
@@ -323,7 +329,6 @@ func (cmdr *Commander) HandleListContainers(ctx context.Context, req lib.Command
 		SendMessage(conn, wsMessage)
 	}
 }
-
 
 // HandleDeleteContainer removes a Docker container by its ID.
 // It forcefully removes the container and sends a confirmation message

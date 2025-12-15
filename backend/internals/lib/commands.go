@@ -15,14 +15,39 @@ const (
 	START_CONTAINER     = "start_container"
 )
 
+
+
+// StartNewContainerConfig defines configuration
+// required to create and start a new Docker container
 type StartNewContainerConfig struct {
-	Image        string `json:"image" binding:"required"`
-	ExposedPorts int    `json:"exposed_ports"`
-	Protocol     string `json:"protocol"`
-	HostIP       string `json:"host_ip"`
-	HostPort     string `json:"host_port"`
-	Name         string `json:"name" binding:"required"`
+
+	// Image is the Docker image name
+	// Example: "redis", "nginx:latest"
+	Image string `json:"image" binding:"required"`
+
+	// ContainerPort is the port the application
+	// listens on INSIDE the container
+	// Example: Redis -> 6379, Nginx -> 80
+	ContainerPort int `json:"container_port"`
+
+	// HostPort is the port exposed on the HOST machine
+	// Example: localhost:30001 -> container:6379
+	HostPort int `json:"host_port"`
+
+	// Protocol defines transport protocol
+	// Allowed values: "tcp", "udp"
+	// Default: "tcp"
+	Protocol string `json:"protocol"`
+
+	// HostIP defines the host interface to bind
+	// Default: "0.0.0.0"
+	HostIP string `json:"host_ip"`
+
+	// Name is the Docker container name
+	Name string `json:"name" binding:"required"`
 }
+
+
 
 type ListContainersConfig struct {
 	Size bool `json:"size"`

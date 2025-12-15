@@ -16,7 +16,7 @@ type CommandHandler struct {
 	ws *WebsocketService
 }
 
-// genral request structure for container commands like list containers etc
+// general request structure for container commands like list containers etc
 // request structure for containers for specific container commands like delete container etc
 type RequestType struct {
 	MachineID   string          `json:"machine_id" binding:"required"`
