@@ -86,6 +86,7 @@ func (Cmdr *Commander) Run(ctx context.Context) {
 			// Add logic to delete the specified container
 		case lib.STOP_CONTAINER:
 			log.Println("Processing STOP_CONTAINER command for ContainerID:", req.ContainerID)
+			Cmdr.HandleStopContainer(ctx, req, conn)
 			// Add logic to stop the specified container
 		case lib.START_NEW_CONTAINER:
 			log.Println("Processing START_CONTAINER command for ContainerID:", req.ContainerID)
@@ -361,8 +362,11 @@ func (cmdr *Commander) HandleDeleteContainer(ctx context.Context, req lib.Comman
 //   - conn: WebSocket connection for sending stop response
 func (Cmdr *Commander) HandleStopContainer(ctx context.Context, req lib.Command, conn *websocket.Conn) {
 	wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
-	log.Println("Processing STOP_CONTAINER command for ContainerID:", req.ContainerID)
-	timeout := 10 // seconds
+	fmt.Println("Processing STOP_CONTAINER command for ContainerID:", req.ContainerID)
+
+	// Using a timeout of 5 seconds for stopping the container
+	// overrides the default 10 seconds
+	timeout := 5 // seconds
 	err := Cmdr.dockerClient.ContainerStop(ctx, req.ContainerID, container.StopOptions{Timeout: &timeout})
 	if err != nil {
 		wsMessage.Payload.Error = err.Error()
