@@ -14,18 +14,29 @@ import (
 // MockDockerClient is a fake Docker client used for unit tests.
 // It does NOT talk to real Docker.
 // It simply returns fake values so your business logic can be tested.
-type MockDockerClient struct{}
+type MockDockerClient struct {
+	ImagePullFn       func(ctx context.Context, ref string, opts image.PullOptions) (io.ReadCloser, error)
+	ContainerCreateFn func(ctx context.Context, config *container.Config, hostConfig *container.HostConfig,
+		networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string,
+	) (container.CreateResponse, error)
+
+	ContainerStartFn   func(ctx context.Context, containerID string, options container.StartOptions) error
+	ContainerListFn    func(ctx context.Context, options container.ListOptions) ([]container.Summary, error)
+	ContainerRemoveFn  func(ctx context.Context, containerID string, options container.RemoveOptions) error
+	ContainerStopFn    func(ctx context.Context, containerID string, options container.StopOptions) error
+	ContainerRestartFn func(ctx context.Context, containerID string, options container.StopOptions) error
+}
 
 // ImagePull pretends to pull a Docker image successfully.
 func (m *MockDockerClient) ImagePull(
-	ctx context.Context,
-	ref string,
-	opts image.PullOptions,
+	ctx context.Context, ref string, opts image.PullOptions,
 ) (io.ReadCloser, error) {
-	return io.NopCloser(strings.NewReader("fake image pull")), nil
+	if m.ImagePullFn == nil {
+		return io.NopCloser(strings.NewReader("")), nil
+	}
+	return m.ImagePullFn(ctx, ref, opts)
 }
 
-// ContainerCreate pretends to create a container and returns a fake container ID.
 func (m *MockDockerClient) ContainerCreate(
 	ctx context.Context,
 	config *container.Config,
@@ -34,59 +45,53 @@ func (m *MockDockerClient) ContainerCreate(
 	platform *ocispec.Platform,
 	containerName string,
 ) (container.CreateResponse, error) {
-	return container.CreateResponse{
-		ID: "fake_container_id",
-	}, nil
+	if m.ContainerCreateFn == nil {
+		return container.CreateResponse{ID: "fake_container_id"}, nil
+	}
+	return m.ContainerCreateFn(ctx, config, hostConfig, networkingConfig, platform, containerName)
 }
 
-// ContainerStart pretends to start a container successfully.
 func (m *MockDockerClient) ContainerStart(
-	ctx context.Context,
-	containerID string,
-	options container.StartOptions,
+	ctx context.Context, containerID string, options container.StartOptions,
 ) error {
-	return nil
+	if m.ContainerStartFn == nil {
+		return nil
+	}
+	return m.ContainerStartFn(ctx, containerID, options)
 }
 
-// ContainerList pretends that one container exists.
 func (m *MockDockerClient) ContainerList(
-	ctx context.Context,
-	options container.ListOptions,
+	ctx context.Context, options container.ListOptions,
 ) ([]container.Summary, error) {
-	return []container.Summary{
-		{
-			ID:    "fake_container_id",
-			Image: "redis",
-		},
-	}, nil
+	if m.ContainerListFn == nil {
+		return nil, nil
+	}
+	return m.ContainerListFn(ctx, options)
 }
 
-// ContainerRemove pretends to remove a container successfully.
 func (m *MockDockerClient) ContainerRemove(
-	ctx context.Context,
-	containerID string,
-	options container.RemoveOptions,
+	ctx context.Context, containerID string, options container.RemoveOptions,
 ) error {
-	return nil
+	if m.ContainerRemoveFn == nil {
+		return nil
+	}
+	return m.ContainerRemoveFn(ctx, containerID, options)
 }
 
-// ContainerStop pretends to stop a container successfully.
 func (m *MockDockerClient) ContainerStop(
-	ctx context.Context,
-	containerID string,
-	options container.StopOptions,
+	ctx context.Context, containerID string, options container.StopOptions,
 ) error {
-	return nil
+	if m.ContainerStopFn == nil {
+		return nil
+	}
+	return m.ContainerStopFn(ctx, containerID, options)
 }
 
-// ContainerRestart pretends to restart a container successfully.
 func (m *MockDockerClient) ContainerRestart(
-	ctx context.Context,
-	containerID string,
-	options container.StopOptions,
+	ctx context.Context, containerID string, options container.StopOptions,
 ) error {
-	return nil
+	if m.ContainerRestartFn == nil {
+		return nil
+	}
+	return m.ContainerRestartFn(ctx, containerID, options)
 }
-
-// Compile-time check to ensure MockDockerClient implements DockerClient.
-var _ DockerClient = (*MockDockerClient)(nil)

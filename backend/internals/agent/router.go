@@ -5,7 +5,6 @@ import (
 	"context"
 )
 
-
 // handleMessages routes incoming commands to the appropriate handler methods.
 // It is passed to the WSClient receive method as a callback function and returns a WsMessage with the operation result.
 func MessageRouter(ctx context.Context, req lib.Command, h *Handler) lib.WsMessage {
@@ -36,4 +35,3 @@ func MessageRouter(ctx context.Context, req lib.Command, h *Handler) lib.WsMessa
 
 	return wsMessage
 }
-

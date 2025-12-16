@@ -43,7 +43,7 @@ func main() {
 		}
 		// user := api.Group("/user", userMiddleware.UserMiddleware())
 		_ = userMiddleware
-		user := api.Group("/user" )
+		user := api.Group("/user")
 		{
 
 			user.GET("/profile", userHandler.GetUser)

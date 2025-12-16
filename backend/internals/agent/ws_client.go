@@ -66,7 +66,7 @@ func (c *WSClient) Send(msg lib.WsMessage) error {
 
 // Receive continuously reads messages from the WebSocket connection and invokes the provided handler function.
 // It blocks until the connection is closed or an error occurs.
-func (c *WSClient) Receive(ctx context.Context , onMessage func(lib.Command)) {
+func (c *WSClient) Receive(ctx context.Context, onMessage func(lib.Command)) {
 	for {
 		_, data, err := c.conn.ReadMessage()
 		if err != nil {
@@ -97,6 +97,3 @@ func (c *WSClient) Close() error {
 	}
 	return nil
 }
-
-
-
