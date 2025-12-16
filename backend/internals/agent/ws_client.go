@@ -2,6 +2,7 @@ package agents
 
 import (
 	"aetrix/observer/internals/lib"
+	"context"
 	"encoding/json"
 	"log"
 	"net/url"
@@ -13,7 +14,7 @@ import (
 type WSClientInterface interface {
 	Connect() error
 	Send(msg lib.WsMessage) error
-	Receive(handler func(lib.Command))
+	Receive(ctx context.Context, onMessage func(lib.Command))
 	Close() error
 }
 
@@ -65,10 +66,11 @@ func (c *WSClient) Send(msg lib.WsMessage) error {
 
 // Receive continuously reads messages from the WebSocket connection and invokes the provided handler function.
 // It blocks until the connection is closed or an error occurs.
-func (c *WSClient) Receive(handler func(lib.Command)) {
+func (c *WSClient) Receive(ctx context.Context , onMessage func(lib.Command)) {
 	for {
 		_, data, err := c.conn.ReadMessage()
 		if err != nil {
+			// Happens when socket is closed or network error
 			return
 		}
 
@@ -77,7 +79,13 @@ func (c *WSClient) Receive(handler func(lib.Command)) {
 			continue
 		}
 
-		handler(cmd)
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			onMessage(cmd) // Assuming NewHandler initializes a Handler with necessary dependencies
+
+		}
 	}
 }
 
@@ -89,3 +97,6 @@ func (c *WSClient) Close() error {
 	}
 	return nil
 }
+
+
+

@@ -1,32 +1,42 @@
 package main
 
 import (
-	"aetrix/observer/internals/agent"
+	agents "aetrix/observer/internals/agent"
+	"aetrix/observer/internals/lib"
 	"context"
+	"log"
+	"time"
 
 	"github.com/docker/docker/client"
 )
 
-// a seprate light weight routine
-// a worker is goroutine
-// a worker will find save all running containers
-// a new  container start then in next fetch worker will add these into list ,
-// if a container not found or stoped from previos list
-// record the issue
-// start a rotine for restart (with retry logic)
-// report the error , outcone through mail service
-
 
 
 func main() {
-	// Initialize and start the agent
-	config := agents.GetDefaultCommander()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		panic(err)
 	}
-	agent := agents.NewCommander(cli , config)
+	ws := agents.NewWSClient("0.0.0.0", "/agent", "agent-1")
+	handler := agents.NewHandler(cli)
+	err = ws.Connect()
+	if err != nil {
+		panic(err)
+	}
 
-	// Run the agent
-	agent.Run(context.Background())
+	defer ws.Close()
+
+	// Start resource monitoring in a separate goroutine
+	go agents.StartResourceMonitor(ctx, ws, "agent-1", time.Second*3)
+
+	// Listen for incoming messages and route them to the appropriate handler
+	go ws.Receive(ctx, func(cmd lib.Command) {
+		response := agents.MessageRouter(ctx, cmd, handler)
+		if err := ws.Send(response); err != nil {
+			log.Println("send error:", err)
+		}
+	})
+
 }
