@@ -11,6 +11,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
+
 // MockDockerClient is a fake Docker client used for unit tests.
 // It does NOT talk to real Docker.
 // It simply returns fake values so your business logic can be tested.
@@ -95,3 +96,4 @@ func (m *MockDockerClient) ContainerRestart(
 	}
 	return m.ContainerRestartFn(ctx, containerID, options)
 }
+

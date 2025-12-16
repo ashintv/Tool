@@ -150,3 +150,15 @@ func TestHandleListContainers(t *testing.T) {
 	}
 
 }
+
+func TestHandleStartNewContainer(t *testing.T) {
+
+}
+
+func TestHandleDeleteContainer(t *testing.T) {}
+
+func TestHandleStopContainer(t *testing.T) {}
+
+func TestHandleRestartContainer(t *testing.T) {}
+
+func TestHandleStartContainer(t *testing.T) {}
