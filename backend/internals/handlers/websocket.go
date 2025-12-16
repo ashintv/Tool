@@ -159,11 +159,12 @@ func (s *WebsocketService) AddSubscriber(machineID string, conn *websocket.Conn,
 }
 
 func (s *WebsocketService) SendToSubscribers(machineID string, event string) error {
+	fmt.Printf("Notifying subscribers of machine %s: %s\n", machineID, event)
 	s.mu.Lock()
 	subscribers, exists := s.Subscribers[machineID]
 	s.mu.Unlock()
 	if !exists {
-		return fmt.Errorf("no subscribers for machine %s", machineID)
+		return nil
 	}
 	for _, sub := range subscribers {
 		err := sub.conn.WriteMessage(websocket.TextMessage, []byte(event))
@@ -184,7 +185,7 @@ func (s *WebsocketService) Unsubscribe(machineID string, username string) error 
 	defer s.mu.Unlock()
 	subscribers, exists := s.Subscribers[machineID]
 	if !exists {
-		return fmt.Errorf("no subscribers for machine %s", machineID)
+		return nil
 	}
 	for i, sub := range subscribers {
 		if username == sub.username {

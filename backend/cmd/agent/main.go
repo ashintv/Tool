@@ -5,12 +5,13 @@ import (
 	"aetrix/observer/internals/lib"
 	"context"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/docker/docker/client"
 )
-
-
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -19,7 +20,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	ws := agents.NewWSClient("0.0.0.0", "/agent", "agent-1")
+	ws := agents.NewWSClient("0.0.0.0:8080", "/agent", "agent-1")
 	handler := agents.NewHandler(cli)
 	err = ws.Connect()
 	if err != nil {
@@ -38,5 +39,17 @@ func main() {
 			log.Println("send error:", err)
 		}
 	})
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+
+	log.Println("Agent running. Press Ctrl+C to stop.")
+
+	<-sigCh
+	log.Println("Shuting down agent...")
+	cancel()
+	ws.Close()
+	time.Sleep(2 * time.Second) // Give some time for cleanup
+	log.Println("Agent stopped.")
 
 }
