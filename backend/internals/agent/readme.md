@@ -16,15 +16,18 @@ The agent package is organized into the following subpackages:
 
 ```
 internals/agent/
-├── docker/          # Docker container management
-│   ├── client.go    # Docker client interface
-│   ├── handler.go   # Container operation handlers
-│   └── mock_client.go # Mock client for testing
-├── websocket/       # WebSocket communication
-│   └── client.go    # WebSocket client implementation
-├── monitoring/      # System resource monitoring
-│   └── resource.go  # Resource monitoring implementation
-└── router.go        # Command routing logic
+├── docker/                 # Docker client interface and mocking
+│   ├── docker_client.go    # DockerClient interface definition
+│   └── docker_mock_client.go # Mock client for testing
+├── handler/                # Container operation handlers
+│   ├── handler.go          # Docker container lifecycle handlers
+│   └── handler_test.go     # Comprehensive handler tests
+├── monitor/                # System resource monitoring
+│   └── resource.go         # Resource monitoring implementation
+└── websocket/              # WebSocket communication
+    ├── ws_client.go        # WebSocket client implementation
+    ├── ws_client_test.go   # WebSocket client tests
+    └── router.go           # Command routing logic
 ```
 
 ### Package Structure
@@ -36,17 +39,20 @@ internals/agent/
                                                     │
                                                     ▼
                                            ┌──────────────┐
-                                           │ MessageRouter │
+                                           │ Router       │
+                                           │ (router.go)  │
                                            └──────────────┘
                                                     │
                                                     ▼
                                            ┌──────────────┐
-                                           │docker.Handler│
+                                           │   Handler    │
+                                           │ (handler.go) │
                                            └──────────────┘
                                                     │
                                                     ▼
                                            ┌──────────────┐
-                                           │docker.Client │
+                                           │DockerClient  │
+                                           │ (interface)  │
                                            └──────────────┘
 ```
 
@@ -54,24 +60,13 @@ internals/agent/
 
 ### Docker Package (`docker/`)
 
-Handles all Docker-related operations including container lifecycle management.
+Defines the Docker client interface for easy testing and mocking.
 
-#### `docker.Handler` (`handler.go`)
+#### `docker.DockerClient` (`docker_client.go`)
 
-The `Handler` manages Docker operations and provides methods for container lifecycle management.
+#### `docker.DockerClient` (`docker_client.go`)
 
-#### Methods
-
-- **`HandleStartNewContainer`** - Pulls a Docker image and creates/starts a new container with specified configuration
-- **`HandleListContainers`** - Retrieves a list of Docker containers with optional filters
-- **`HandleDeleteContainer`** - Removes a Docker container by ID with configurable options
-- **`HandleStopContainer`** - Stops a running container with a 5-second graceful shutdown timeout
-- **`HandleRestartContainer`** - Restarts a container immediately
-- **`HandleStartContainer`** - Starts a stopped container
-
-#### `docker.Client` (`client.go`)
-
-Defines the `Client` interface for Docker SDK interactions, enabling:
+Defines the `DockerClient` interface for Docker SDK interactions, enabling:
 - Easy testing and mocking
 - Abstraction of Docker API complexity
 - Dependency injection for testability
@@ -85,15 +80,36 @@ Defines the `Client` interface for Docker SDK interactions, enabling:
 - `ContainerStop` - Stop containers
 - `ContainerRestart` - Restart containers
 
-#### `docker.MockClient` (`mock_client.go`)
+#### `docker.MockDockerClient` (`docker_mock_client.go`)
 
-A `MockClient` is provided for testing handler methods without requiring an actual Docker daemon.
+A `MockDockerClient` is provided for testing handler methods without requiring an actual Docker daemon. Each method can be customized via function fields for precise test control.
+
+### Handler Package (`handler/`)
+
+Manages all Docker operations and provides methods for container lifecycle management.
+
+#### `handler.Handler` (`handler.go`)
+
+The `Handler` struct uses a `docker.DockerClient` to perform Docker operations.
+
+#### Methods
+
+- **`HandleStartNewContainer`** - Pulls a Docker image and creates/starts a new container with specified configuration
+- **`HandleListContainers`** - Retrieves a list of Docker containers with optional filters
+- **`HandleDeleteContainer`** - Removes a Docker container by ID with configurable options
+- **`HandleStopContainer`** - Stops a running container with a 5-second graceful shutdown timeout
+- **`HandleRestartContainer`** - Restarts a container immediately
+- **`HandleStartContainer`** - Starts a stopped container
+
+#### Tests (`handler_test.go`)
+
+Comprehensive unit tests for all handler methods using `docker.MockDockerClient`.
 
 ### WebSocket Package (`websocket/`)
 
 Manages WebSocket connections and communication with the central server.
 
-#### `websocket.Client` (`client.go`)
+#### `websocket.Client` (`ws_client.go`)
 
 The `Client` manages WebSocket connections for the agent.
 
@@ -109,11 +125,19 @@ The `Client` manages WebSocket connections for the agent.
 - **`Receive(ctx, onMessage, onError)`** - Continuously reads and processes incoming messages
 - **`Close()`** - Gracefully closes the WebSocket connection
 
-### Monitoring Package (`monitoring/`)
+#### Message Router (`router.go`)
+
+Routes incoming commands to appropriate handler methods based on the command type.
+
+#### Tests (`ws_client_test.go`)
+
+Unit tests for WebSocket client functionality.
+
+### Monitor Package (`monitor/`)
 
 Provides system resource monitoring capabilities.
 
-#### `monitoring.ResourceMonitor` (`resource.go`)
+#### `monitor.ResourceMonitor` (`resource.go`)
 
 The `ResourceMonitor` provides periodic system resource monitoring.
 
@@ -126,18 +150,28 @@ The `ResourceMonitor` provides periodic system resource monitoring.
 **Methods:**
 - **`NewResourceMonitor(ws, machineID, interval)`** - Creates a new monitor instance
 - **`Start(ctx)`** - Begins the resource monitoring loop
+
+## Usage Example
+
 ```go
 package main
 
 import (
-    "aetrix/observer/internals/agent"
     "aetrix/observer/internals/agent/docker"
-    "aetrix/observer/internals/agent/monitoring"
+    "aetrix/observer/internals/agent/handler"
+    "aetrix/observer/internals/agent/monitor"
     "aetrix/observer/internals/agent/websocket"
     "aetrix/observer/internals/lib"
     "context"
+    "log"
     "time"
     dockerclient "github.com/docker/docker/client"
+)
+
+func main() {
+    ctx, cancel := context.WithCancel(context.Background())
+func main() {
+    ctx, cancel := context.WithCancel(context.Background())
     defer cancel()
 
     // Initialize Docker client
@@ -152,8 +186,8 @@ import (
     // Create WebSocket client
     ws := websocket.NewClient("0.0.0.0:8080", "/agent", "agent-1")
 
-    // Create handler
-    handler := docker.NewHandler(cli)
+    // Create handler with Docker client
+    h := handler.NewHandler(cli)
 
     // Connect to server
     err = ws.Connect()
@@ -163,40 +197,26 @@ import (
     defer ws.Close()
 
     // Start resource monitoring
-    go monitoring.StartResourceMonitor(ctx, ws, "agent-1", time.Second*3)
+    rm := monitor.NewResourceMonitor(ws, "agent-1", time.Second*3)
+    go rm.Start(ctx)
 
-    // Listen for incoming commands
+    // Listen for incoming commands and route them
     go ws.Receive(ctx,
         func(cmd lib.Command) {
-            response := agent.MessageRouter(ctx, cmd, handler)
+            response := websocket.RouteCommand(ctx, cmd, h)
             ws.Send(response)
         },
         func(err error) {
             log.Println("receive error:", err)
         },
     )
-    // Connect to server
-    err = ws.Connect()
-    if err != nil {
-        panic(err)
-    }
-    defer ws.Close()
-
-    // Start resource monitoring
-    go agents.StartResourceMonitor(ctx, ws, "agent-1", time.Second*3)
-}
-```
-
-## Usage Examples
-
-### Starting a New ContaineressageRouter(ctx, cmd, handler)
-        ws.Send(response)
-    })
 
     // Wait for shutdown signal
     // ... (signal handling code)
 }
 ```
+
+## Usage Examples
 
 ### Starting a New Container
 
@@ -234,36 +254,16 @@ The package includes comprehensive unit tests with mock implementations.
 go test ./internals/agent/...
 
 # Test specific package
-go test ./internals/agent/docker
+go test ./internals/agent/handler
 go test ./internals/agent/websocket
-go test ./internals/agent/monitoring
+go test ./internals/agent/docker
 ```
 
 ### Mock Implementations
 
-- **`docker.MockClient`** - Mock Docker client for testing without a Docker daemon
-- Mock WebSocket connections for integration testing
-The package includes comprehensive unit tests with mock implementations.
-
-### Running Tests
-
-```bash
-go test ./internals/agent/...
-```
-
-### Mock Client (`docker_mock_client.go`)
-
-A `MockDockerClient` is provided for testing handler methods without requiring an actual Docker daemon.
-
-## Architecture
-
-```
-┌─────────────┐         WebSocket         ┌──────────────┐
-│   Server    │ ◄─────────────────────────► │  WSClient    │
-└─────────────┘                            └──────────────┘
-                                                    │
-                                                    ▼
-                                           ┌──────────────┐
+- **`docker.MockDockerClient`** - Mock Docker client for testing without a Docker daemon
+- WebSocket client tests in `ws_client_test.go`
+- Handler tests in `handler_test.go` with comprehensive coverage
 ## Dependencies
 
 - `github.com/docker/docker/client` - Docker Engine API client
@@ -278,49 +278,23 @@ A `MockDockerClient` is provided for testing handler methods without requiring a
 - Simple to extend with new features
 
 ### Testability
-## Error Handling
+- Interface-based design for easy mocking
+- Comprehensive test coverage
+- Isolated unit tests for each component
 
-All handler methods return `lib.WsMessage` with either:
-- **Success**: `Payload.Data` contains the result
-- **Error**: `Payload.Error` contains the error message
-
-## Migration Guide
-
-If you're upgrading from the previous flat structure:
-
-### Old Import
-```go
-import "aetrix/observer/internals/agent"
-ws := agent.NewWSClient(...)
-handler := agent.NewHandler(cli)
-agent.StartResourceMonitor(...)
-```
-
-### New Import
-```go
-import (
-    "aetrix/observer/internals/agent"
-    "aetrix/observer/internals/agent/docker"
-    "aetrix/observer/internals/agent/websocket"
-    "aetrix/observer/internals/agent/monitoring"
-)
-ws := websocket.NewClient(...)
-handler := docker.NewHandler(cli)
-monitoring.StartResourceMonitor(...)
-// Router stays in agent package
-agent.MessageRouter(...)
-```
+### Maintainability
 - Well-documented code
 - Consistent naming conventions
 - Clear package boundaries
-                                           │   Handler    │
-                                           └──────────────┘
-                                                    │
-                                                    ▼
-                                           ┌──────────────┐
-                                           │ DockerClient │
-                                           └──────────────┘
-```
+
+## Package Structure Summary
+
+| Package | Files | Purpose |
+|---------|-------|---------|
+| `docker` | `docker_client.go`, `docker_mock_client.go` | Docker client interface and mock implementation |
+| `handler` | `handler.go`, `handler_test.go` | Container lifecycle management and tests |
+| `monitor` | `resource.go` | System resource monitoring |
+| `websocket` | `ws_client.go`, `ws_client_test.go`, `router.go` | WebSocket communication and command routing |
 
 ## Dependencies
 
