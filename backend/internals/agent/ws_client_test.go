@@ -1,4 +1,4 @@
-package agents
+package agent
 
 // Test file for ws_client.go
 // Focuses on testing the WSClient methods:  Send, Receive,
@@ -135,7 +135,7 @@ func TestReceive(t *testing.T) {
 						t.Errorf("unexpected cmd: %s", cmd.CMD)
 					}
 					success <- struct{}{}
-					cancel() 
+					cancel()
 				},
 				func(err error) {
 					errorCh <- err

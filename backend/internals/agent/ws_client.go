@@ -1,4 +1,4 @@
-package agents
+package agent
 
 import (
 	"aetrix/observer/internals/lib"
@@ -9,8 +9,6 @@ import (
 
 	"github.com/gorilla/websocket"
 )
-
-
 
 // wsConn abstracts the websocket connection methods for easier testing and mocking.
 type wsConn interface {

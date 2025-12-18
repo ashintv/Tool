@@ -1,4 +1,4 @@
-package agents
+package agent
 
 import (
 	"aetrix/observer/internals/lib"

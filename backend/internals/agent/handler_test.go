@@ -1,4 +1,4 @@
-package agents
+package agent
 
 import (
 	"aetrix/observer/internals/lib"
@@ -685,7 +685,6 @@ func TestHandleStartContainer(t *testing.T) {
 
 			handler := NewHandler(tt.mockClient)
 			resp := handler.HandleStartContainer(ctx, tt.req)
-
 
 			if tt.expectError {
 				if resp.Payload.Error == "" {
