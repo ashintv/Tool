@@ -74,7 +74,6 @@ func (h *Handler) HandleStartNewContainer(ctx context.Context, req lib.Command) 
 	)
 
 	if err != nil {
-
 		wsMessage.Payload.Error = err.Error()
 		return wsMessage
 	}

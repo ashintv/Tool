@@ -20,7 +20,7 @@ type MockDockerClient struct {
 	ContainerCreateFn func(ctx context.Context, config *container.Config, hostConfig *container.HostConfig,
 		networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string,
 	) (container.CreateResponse, error)
-
+	
 	ContainerStartFn   func(ctx context.Context, containerID string, options container.StartOptions) error
 	ContainerListFn    func(ctx context.Context, options container.ListOptions) ([]container.Summary, error)
 	ContainerRemoveFn  func(ctx context.Context, containerID string, options container.RemoveOptions) error
