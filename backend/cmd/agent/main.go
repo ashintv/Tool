@@ -1,7 +1,9 @@
 package main
 
 import (
-	"aetrix/observer/internals/agent"
+	"aetrix/observer/internals/agent/handler"
+	resource "aetrix/observer/internals/agent/monitor"
+	"aetrix/observer/internals/agent/websocket"
 	"aetrix/observer/internals/lib"
 	"context"
 	"log"
@@ -20,8 +22,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	ws := agent.NewWSClient("0.0.0.0:8080", "/agent", "agent-1")
-	handler := agent.NewHandler(cli)
+	ws := websocket.NewWSClient("0.0.0.0:8080", "/agent", "agent-1")
+	handler := handler.NewHandler(cli)
 	err = ws.Connect()
 	if err != nil {
 		panic(err)
@@ -30,11 +32,11 @@ func main() {
 	defer ws.Close()
 
 	// Start resource monitoring in a separate goroutine
-	go agent.StartResourceMonitor(ctx, ws, "agent-1", time.Second*3)
+	go resource.StartResourceMonitor(ctx, ws, "agent-1", time.Second*3)
 
 	// Listen for incoming messages and route them to the appropriate handler
 	go ws.Receive(ctx, func(cmd lib.Command) {
-		response := agent.MessageRouter(ctx, cmd, handler)
+		response := websocket.MessageRouter(ctx, cmd, handler)
 		if err := ws.Send(response); err != nil {
 			log.Println("send error:", err)
 		}

@@ -1,6 +1,7 @@
-package agent
+package handler
 
 import (
+	"aetrix/observer/internals/agent/docker"
 	"aetrix/observer/internals/lib"
 	"io"
 
@@ -18,7 +19,7 @@ import (
 
 type Test struct {
 	name          string
-	mockClient    *MockDockerClient
+	mockClient    *docker.MockDockerClient
 	req           lib.Command
 	expectError   bool
 	expectedCount int
@@ -30,7 +31,7 @@ func TestHandleListContainers(t *testing.T) {
 	tests := []Test{
 		{
 			name: "Successful listing of containers",
-			mockClient: &MockDockerClient{
+			mockClient: &docker.MockDockerClient{
 				ContainerListFn: func(ctx context.Context, options container.ListOptions) ([]container.Summary, error) {
 					return []container.Summary{
 						// returns more filled container summaries
@@ -49,7 +50,7 @@ func TestHandleListContainers(t *testing.T) {
 
 		{
 			name: "Error listing containers",
-			mockClient: &MockDockerClient{
+			mockClient: &docker.MockDockerClient{
 				ContainerListFn: func(ctx context.Context, options container.ListOptions) ([]container.Summary, error) {
 					return nil, fmt.Errorf("Failed to list")
 				},
@@ -64,7 +65,7 @@ func TestHandleListContainers(t *testing.T) {
 
 		{
 			name: "Test Options with All:true",
-			mockClient: &MockDockerClient{
+			mockClient: &docker.MockDockerClient{
 				ContainerListFn: func(ctx context.Context, options container.ListOptions) ([]container.Summary, error) {
 					if !options.All {
 						return nil, fmt.Errorf(
@@ -93,7 +94,7 @@ func TestHandleListContainers(t *testing.T) {
 
 		{
 			name: "Test Options with size:true",
-			mockClient: &MockDockerClient{
+			mockClient: &docker.MockDockerClient{
 				ContainerListFn: func(ctx context.Context, options container.ListOptions) ([]container.Summary, error) {
 					if !options.Size {
 						return nil, fmt.Errorf(
@@ -162,7 +163,7 @@ func TestHandleStartNewContainer(t *testing.T) {
 	tests := []Test{
 		{
 			name:        "Default",
-			mockClient:  &MockDockerClient{},
+			mockClient:  &docker.MockDockerClient{},
 			expectError: false,
 			req: lib.Command{
 				MachineID: "test-machine",
@@ -179,7 +180,7 @@ func TestHandleStartNewContainer(t *testing.T) {
 		},
 		{
 			name: "Parameter testing",
-			mockClient: &MockDockerClient{
+			mockClient: &docker.MockDockerClient{
 				ContainerStartFn: func(
 					ctx context.Context,
 					containerID string,
@@ -248,7 +249,7 @@ func TestHandleStartNewContainer(t *testing.T) {
 		},
 		{
 			name: "Image pull failure",
-			mockClient: &MockDockerClient{
+			mockClient: &docker.MockDockerClient{
 				ImagePullFn: func(
 					ctx context.Context,
 					ref string,
@@ -274,7 +275,7 @@ func TestHandleStartNewContainer(t *testing.T) {
 
 		{
 			name: "Container creation failure",
-			mockClient: &MockDockerClient{
+			mockClient: &docker.MockDockerClient{
 				ContainerCreateFn: func(ctx context.Context,
 					config *container.Config,
 					hostConfig *container.HostConfig,
@@ -300,7 +301,7 @@ func TestHandleStartNewContainer(t *testing.T) {
 		},
 		{
 			name: "Container start failure",
-			mockClient: &MockDockerClient{
+			mockClient: &docker.MockDockerClient{
 				ContainerStartFn: func(
 					ctx context.Context,
 					containerID string,
@@ -364,7 +365,7 @@ func TestHandleDeleteContainer(t *testing.T) {
 	tests := []Test{
 		{
 			name: "Successful deletion of container",
-			mockClient: &MockDockerClient{
+			mockClient: &docker.MockDockerClient{
 				ContainerRemoveFn: func(
 					ctx context.Context,
 					containerID string,
@@ -385,7 +386,7 @@ func TestHandleDeleteContainer(t *testing.T) {
 		},
 		{
 			name: "Error deleting container",
-			mockClient: &MockDockerClient{
+			mockClient: &docker.MockDockerClient{
 				ContainerRemoveFn: func(
 					ctx context.Context,
 					containerID string,
@@ -403,7 +404,7 @@ func TestHandleDeleteContainer(t *testing.T) {
 		},
 		{
 			name: "Delete with Custom options",
-			mockClient: &MockDockerClient{
+			mockClient: &docker.MockDockerClient{
 				ContainerRemoveFn: func(
 					ctx context.Context,
 					containerID string,
@@ -478,7 +479,7 @@ func TestHandleStopContainer(t *testing.T) {
 	tests := []Test{
 		{
 			name: "Successful stopping of container",
-			mockClient: &MockDockerClient{
+			mockClient: &docker.MockDockerClient{
 				ContainerStopFn: func(
 					ctx context.Context,
 					containerID string,
@@ -499,7 +500,7 @@ func TestHandleStopContainer(t *testing.T) {
 		},
 		{
 			name: "Error stopping container",
-			mockClient: &MockDockerClient{
+			mockClient: &docker.MockDockerClient{
 				ContainerStopFn: func(
 					ctx context.Context,
 					containerID string,
@@ -558,7 +559,7 @@ func TestHandleRestartContainer(t *testing.T) {
 	tests := []Test{
 		{
 			name: "Successful restarting of container",
-			mockClient: &MockDockerClient{
+			mockClient: &docker.MockDockerClient{
 				ContainerRestartFn: func(
 					ctx context.Context,
 					containerID string,
@@ -579,7 +580,7 @@ func TestHandleRestartContainer(t *testing.T) {
 		},
 		{
 			name: "Error restarting container",
-			mockClient: &MockDockerClient{
+			mockClient: &docker.MockDockerClient{
 				ContainerRestartFn: func(
 					ctx context.Context,
 					containerID string,
@@ -638,7 +639,7 @@ func TestHandleStartContainer(t *testing.T) {
 	tests := []Test{
 		{
 			name: "Successful starting of container",
-			mockClient: &MockDockerClient{
+			mockClient: &docker.MockDockerClient{
 				ContainerStartFn: func(
 					ctx context.Context,
 					containerID string,
@@ -659,7 +660,7 @@ func TestHandleStartContainer(t *testing.T) {
 		},
 		{
 			name: "Error starting container",
-			mockClient: &MockDockerClient{
+			mockClient: &docker.MockDockerClient{
 				ContainerStartFn: func(
 					ctx context.Context,
 					containerID string,

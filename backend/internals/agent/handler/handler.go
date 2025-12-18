@@ -1,6 +1,7 @@
-package agent
+package handler
 
 import (
+	"aetrix/observer/internals/agent/docker"
 	"aetrix/observer/internals/lib"
 	"context"
 
@@ -16,11 +17,11 @@ import (
 
 // Handler manages Docker operations and provides methods for container lifecycle management.
 type Handler struct {
-	dockerClient DockerClient
+	dockerClient docker.DockerClient
 }
 
 // NewHandler creates and returns a new Handler instance with the provided DockerClient.
-func NewHandler(dockerClient DockerClient) *Handler {
+func NewHandler(dockerClient docker.DockerClient) *Handler {
 	return &Handler{
 		dockerClient: dockerClient,
 	}

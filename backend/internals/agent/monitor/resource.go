@@ -1,6 +1,7 @@
-package agent
+package resource
 
 import (
+	"aetrix/observer/internals/agent/websocket"
 	"aetrix/observer/internals/lib"
 	"context"
 	"log"
@@ -9,7 +10,7 @@ import (
 
 func StartResourceMonitor(
 	ctx context.Context,
-	ws *WSClient,
+	ws *websocket.WSClient,
 	machineID string,
 	interval time.Duration,
 ) {

@@ -1,4 +1,4 @@
-package agent
+package websocket
 
 import (
 	"aetrix/observer/internals/lib"

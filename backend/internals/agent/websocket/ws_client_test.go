@@ -1,4 +1,4 @@
-package agent
+package websocket
 
 // Test file for ws_client.go
 // Focuses on testing the WSClient methods:  Send, Receive,
