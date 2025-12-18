@@ -10,11 +10,12 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// WSClientInterface defines the contract for websocket client interactions.
-type WSClientInterface interface {
-	Connect() error
-	Send(msg lib.WsMessage) error
-	Receive(ctx context.Context, onMessage func(lib.Command))
+
+
+// wsConn abstracts the websocket connection methods for easier testing and mocking.
+type wsConn interface {
+	WriteMessage(messageType int, data []byte) error
+	ReadMessage() (int, []byte, error)
 	Close() error
 }
 
@@ -23,7 +24,7 @@ type WSClient struct {
 	host       string
 	path       string
 	clientName string
-	conn       *websocket.Conn
+	conn       wsConn
 }
 
 // NewWSClient creates and returns a new WSClient instance with the specified connection parameters.
@@ -66,11 +67,11 @@ func (c *WSClient) Send(msg lib.WsMessage) error {
 
 // Receive continuously reads messages from the WebSocket connection and invokes the provided handler function.
 // It blocks until the connection is closed or an error occurs.
-func (c *WSClient) Receive(ctx context.Context, onMessage func(lib.Command)) {
+func (c *WSClient) Receive(ctx context.Context, onMessage func(lib.Command), onError func(error)) {
 	for {
 		_, data, err := c.conn.ReadMessage()
 		if err != nil {
-			// Happens when socket is closed or network error
+			onError(err) // Happens when socket is closed or network error
 			return
 		}
 

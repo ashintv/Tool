@@ -9,7 +9,7 @@ import (
 
 func StartResourceMonitor(
 	ctx context.Context,
-	ws WSClientInterface,
+	ws *WSClient,
 	machineID string,
 	interval time.Duration,
 ) {
