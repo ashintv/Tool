@@ -360,7 +360,119 @@ func TestHandleStartNewContainer(t *testing.T) {
 
 }
 
-func TestHandleDeleteContainer(t *testing.T) {}
+func TestHandleDeleteContainer(t *testing.T) {
+	tests := []Test{
+		{
+			name: "Successful deletion of container",
+			mockClient: &MockDockerClient{
+				ContainerRemoveFn: func(
+					ctx context.Context,
+					containerID string,
+					options container.RemoveOptions,
+				) error {
+					if containerID != "test_container" {
+						return fmt.Errorf(`expected container Id to be: "test_container" , got %s `, containerID)
+					}
+					return nil
+				},
+			},
+			req: lib.Command{
+				CMD:         lib.DELETE_CONTAINER,
+				MachineID:   "test-machine",
+				ContainerID: "test_container",
+			},
+			expectError: false,
+		},
+		{
+			name: "Error deleting container",
+			mockClient: &MockDockerClient{
+				ContainerRemoveFn: func(
+					ctx context.Context,
+					containerID string,
+					options container.RemoveOptions,
+				) error {
+					return fmt.Errorf("Failed to delete")
+				},
+			},
+			req: lib.Command{
+				CMD:         lib.DELETE_CONTAINER,
+				MachineID:   "test-machine",
+				ContainerID: "test_container",
+			},
+			expectError: true,
+		},
+		{
+			name: "Delete with Custom options",
+			mockClient: &MockDockerClient{
+				ContainerRemoveFn: func(
+					ctx context.Context,
+					containerID string,
+					options container.RemoveOptions,
+				) error {
+					if containerID != "test_container" {
+						return fmt.Errorf(`expected container Id to be: "test_container" , got %s `, containerID)
+					}
+					if !options.Force || !options.RemoveVolumes || !options.RemoveLinks {
+						return fmt.Errorf(
+							`expected default options Force:true, Volume:true, Links:true but got Force:%v, Volume:%v, Links:%v`,
+							options.Force, options.RemoveVolumes, options.RemoveLinks,
+						)
+					}
+					return nil
+				},
+			},
+			req: lib.Command{
+				CMD:         lib.DELETE_CONTAINER,
+				MachineID:   "test-machine",
+				ContainerID: "test_container",
+				Params: lib.Params{
+					DeleteContainerConfig: &lib.DeleteContainerConfig{
+						Force:  true,
+						Volume: true,
+						Links:  true,
+					},
+				},
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+
+			handler := NewHandler(tt.mockClient)
+			resp := handler.HandleDeleteContainer(ctx, tt.req)
+
+			if tt.expectError {
+				if resp.Payload.Error == "" {
+					t.Fatal("Error expected got no error")
+				}
+				return
+			}
+
+			if !tt.expectError {
+				if resp.Payload.Error != "" {
+					t.Fatalf("Error unexpected got error: %s", resp.Payload.Error)
+				}
+				return
+			}
+
+			data, ok := resp.Payload.Data.(string)
+			if !ok {
+				t.Fatalf("payload data is not string")
+				return
+			}
+			expectedMessage := "Container deleted successfully"
+			if data != expectedMessage {
+				t.Fatalf("expected payload data: %s, got: %s", expectedMessage, data)
+			}
+
+		})
+	}
+}
 
 func TestHandleStopContainer(t *testing.T) {}
 
