@@ -135,7 +135,7 @@ func TestReceive(t *testing.T) {
 						t.Errorf("unexpected cmd: %s", cmd.CMD)
 					}
 					success <- struct{}{}
-					cancel() // 🔥 stop Receive
+					cancel() 
 				},
 				func(err error) {
 					errorCh <- err

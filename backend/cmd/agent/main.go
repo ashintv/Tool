@@ -38,7 +38,11 @@ func main() {
 		if err := ws.Send(response); err != nil {
 			log.Println("send error:", err)
 		}
-	})
+	},
+		func(err error) {
+			log.Println("receive error:", err)
+		},
+	)
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
