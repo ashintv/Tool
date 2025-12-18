@@ -554,6 +554,84 @@ func TestHandleStopContainer(t *testing.T) {
 	}
 }
 
-func TestHandleRestartContainer(t *testing.T) {}
+func TestHandleRestartContainer(t *testing.T) {
+	tests := []Test{
+		{
+			name: "Successful restarting of container",
+			mockClient: &MockDockerClient{
+				ContainerRestartFn: func(
+					ctx context.Context,
+					containerID string,
+					options container.StopOptions,
+				) error {
+					if containerID != "test_container" {
+						return fmt.Errorf(`expected container Id to be: "test_container" , got %s `, containerID)
+					}
+					return nil
+				},
+			},
+			req: lib.Command{
+				CMD:         lib.RESTART_CONTAINER,
+				MachineID:   "test-machine",
+				ContainerID: "test_container",
+			},
+			expectError: false,
+		},
+		{
+			name: "Error restarting container",
+			mockClient: &MockDockerClient{
+				ContainerRestartFn: func(
+					ctx context.Context,
+					containerID string,
+					options container.StopOptions,
+				) error {
+					return fmt.Errorf("Failed to restart")
+				},
+			},
+			req: lib.Command{
+				CMD:         lib.RESTART_CONTAINER,
+				MachineID:   "test-machine",
+				ContainerID: "test_container",
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+
+			handler := NewHandler(tt.mockClient)
+			resp := handler.HandleRestartContainer(ctx, tt.req)
+
+			if tt.expectError {
+				if resp.Payload.Error == "" {
+					t.Fatal("Error expected got no error")
+				}
+				return
+			}
+
+			if !tt.expectError {
+				if resp.Payload.Error != "" {
+					t.Fatalf("Error unexpected got error: %s", resp.Payload.Error)
+				}
+				return
+			}
+
+			data, ok := resp.Payload.Data.(string)
+			if !ok {
+				t.Fatalf("payload data is not string")
+				return
+			}
+			expectedMessage := "Container restarted successfully"
+			if data != expectedMessage {
+				t.Fatalf("expected payload data: %s, got: %s", expectedMessage, data)
+			}
+
+		})
+	}
+}
 
 func TestHandleStartContainer(t *testing.T) {}
