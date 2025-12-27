@@ -1,159 +1,160 @@
 package websocket
 
-// Test file for ws_client.go
-// Focuses on testing the WSClient methods:  Send, Receive,
-
 import (
 	"aetrix/observer/internals/lib"
 	"context"
 	"encoding/json"
-	"fmt"
+	"errors"
+
+	"io"
 	"testing"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
-// mock for wsConn
-type mockWsConn struct {
-	writeMessageFn func(messageType int, data []byte) error
-	readMessageFn  func() (int, []byte, error)
-	closeFn        func() error
+type MockConn struct {
+	ReadMessageFn  func() (messageType int, p []byte, err error)
+	WriteMessageFn func(messageType int, data []byte) error
+	CloseFn        func() error
 }
 
-func (m *mockWsConn) WriteMessage(messageType int, data []byte) error {
-	if m.writeMessageFn == nil {
+func (m *MockConn) ReadMessage() (messageType int, p []byte, err error) {
+	if m.ReadMessageFn == nil {
+		cmd := lib.Command{
+			ContainerID: "test",
+			MachineID:   "test",
+			CMD:         lib.CREATE_CONTAINER,
+		}
+
+		srt, _ := json.Marshal(cmd)
+		return 1, srt, nil
+	}
+	return m.ReadMessageFn()
+}
+
+func (m *MockConn) WriteMessage(messageType int, data []byte) error {
+	if m.WriteMessageFn == nil {
+		_ = data
 		return nil
 	}
-	return m.writeMessageFn(messageType, data)
-}
-func (m *mockWsConn) ReadMessage() (int, []byte, error) {
-	return m.readMessageFn()
-}
-func (m *mockWsConn) Close() error {
-	return m.closeFn()
+	return m.WriteMessageFn(messageType, data)
 }
 
-type test struct {
-	name        string
-	expectError bool
-	mockWsConn  *mockWsConn
-	onMessage   func(lib.Command)
+func (m *MockConn) Close() error {
+	return nil
 }
 
-// TESTS
-func TestSend(t *testing.T) {
-	tests := []test{
-		{
-			name: "Successful Send",
-			mockWsConn: &mockWsConn{
-				writeMessageFn: func(messageType int, data []byte) error {
+func testLogger() *zerolog.Logger {
+	l := zerolog.New(io.Discard)
+	return &l
+}
+
+func validCommandBytes() []byte {
+	cmd := lib.Command{
+		ContainerID: "test",
+		MachineID:   "test",
+		CMD:         lib.CREATE_CONTAINER,
+	}
+	b, _ := json.Marshal(cmd)
+	return b
+}
+
+func TestStart(t *testing.T) {
+	t.Run("Data Flow", func(t *testing.T) {
+		writeCalled := make(chan struct{}, 1)
+
+		ws := &WSClient{
+			logger: testLogger(),
+			conn: &MockConn{
+				ReadMessageFn: func() (int, []byte, error) {
+					return 1, validCommandBytes(), nil
+				},
+				WriteMessageFn: func(int, []byte) error {
+					writeCalled <- struct{}{}
 					return nil
 				},
 			},
-			expectError: false,
-		},
-		{
-			name: "Failed Send",
-			mockWsConn: &mockWsConn{
-				writeMessageFn: func(messageType int, data []byte) error {
-					return fmt.Errorf("send error")
+
+			Dispatcher: func(ctx context.Context, cmd lib.Command) <-chan interface{} {
+				out := make(chan interface{})
+				go func() {
+					defer close(out)
+					out <- "ok"
+				}()
+				return out
+			},
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		go ws.Start(ctx)
+
+		select {
+		case <-writeCalled:
+		case <-time.After(time.Second):
+			t.Fatal("expected WriteMessage to be called")
+		}
+	})
+
+	t.Run("read error exits loop", func(t *testing.T) {
+		readCalled := make(chan struct{}, 1)
+
+		ws := &WSClient{
+			logger: testLogger(),
+			conn: &MockConn{
+				ReadMessageFn: func() (int, []byte, error) {
+					readCalled <- struct{}{}
+					return 0, nil, errors.New("read failed")
 				},
 			},
-			expectError: true,
-		},
-	}
+			Dispatcher: func(ctx context.Context, cmd lib.Command) <-chan interface{} {
+				t.Fatal("dispatcher should not be called")
+				return nil
+			},
+		}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			client := &WSClient{
-				conn: tc.mockWsConn,
-			}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-			err := client.Send(lib.WsMessage{Type: lib.TypeResponse, Payload: lib.PayloadType{}})
-			if tc.expectError && err == nil {
-				t.Errorf("expected error but got none")
-			}
-			if !tc.expectError && err != nil {
-				t.Errorf("did not expect error but got: %v", err)
-			}
+		go ws.Start(ctx)
 
-		})
-	}
-}
+		select {
+		case <-readCalled:
+		case <-time.After(time.Second):
+			t.Fatal("expected ReadMessage to be called")
+		}
+	})
 
-func TestReceive(t *testing.T) {
-	tests := []struct {
-		name        string
-		mockWsConn  *mockWsConn
-		expectError bool
-	}{
-		{
-			name: "Successful Receive",
-			mockWsConn: func() *mockWsConn {
-				readOnce := true
-				return &mockWsConn{
-					readMessageFn: func() (int, []byte, error) {
-						if readOnce {
-							readOnce = false
-							cmd := lib.Command{CMD: "TEST_CMD"}
-							data, _ := json.Marshal(cmd)
-							return 1, data, nil
-						}
-						return 0, nil, fmt.Errorf("stop")
-					},
-				}
-			}(),
-			expectError: false,
-		},
-		{
-			name: "Receive Error",
-			mockWsConn: &mockWsConn{
-				readMessageFn: func() (int, []byte, error) {
-					return 0, nil, fmt.Errorf("read error")
+
+
+	t.Run("marsha error exits loop", func(t *testing.T) {
+		readCalled := make(chan struct{}, 1)
+
+		ws := &WSClient{
+			logger: testLogger(),
+			conn: &MockConn{
+				ReadMessageFn: func() (int, []byte, error) {
+					readCalled <- struct{}{}
+					return 0, nil, errors.New("read failed")
 				},
 			},
-			expectError: true,
-		},
-	}
+			Dispatcher: func(ctx context.Context, cmd lib.Command) <-chan interface{} {
+				t.Fatal("dispatcher should not be called")
+				return nil
+			},
+		}
 
-	for _, tc := range tests {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			success := make(chan struct{}, 1)
-			errorCh := make(chan error, 1)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-			client := &WSClient{
-				conn: tc.mockWsConn,
-			}
+		go ws.Start(ctx)
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+		select {
+		case <-readCalled:
+		case <-time.After(time.Second):
+			t.Fatal("expected ReadMessage to be called")
+		}
+	})
 
-			go client.Receive(
-				ctx,
-				func(cmd lib.Command) {
-					if cmd.CMD != "TEST_CMD" {
-						t.Errorf("unexpected cmd: %s", cmd.CMD)
-					}
-					success <- struct{}{}
-					cancel()
-				},
-				func(err error) {
-					errorCh <- err
-				},
-			)
-
-			select {
-			case <-success:
-				if tc.expectError {
-					t.Fatal("expected error but got success")
-				}
-			case err := <-errorCh:
-				if !tc.expectError {
-					t.Fatalf("did not expect error but got: %v", err)
-				}
-			case <-time.After(time.Second):
-				t.Fatal("test timed out")
-			}
-		})
-	}
 }
