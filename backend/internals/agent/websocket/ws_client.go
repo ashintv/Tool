@@ -4,16 +4,16 @@ import (
 	"aetrix/observer/internals/lib"
 	"context"
 	"encoding/json"
-	"log"
 	"net/url"
 
 	"github.com/gorilla/websocket"
+	"github.com/rs/zerolog"
 )
 
 // wsConn abstracts the websocket connection methods for easier testing and mocking.
-type wsConn interface {
+type Conn interface {
+	ReadMessage() (messageType int, p []byte, err error)
 	WriteMessage(messageType int, data []byte) error
-	ReadMessage() (int, []byte, error)
 	Close() error
 }
 
@@ -22,15 +22,20 @@ type WSClient struct {
 	host       string
 	path       string
 	clientName string
-	conn       wsConn
+	logger     *zerolog.Logger
+	conn       Conn
+	//TODO Need a better type
+	Dispatcher func(ctx context.Context, cmd lib.Command) <-chan interface{}
 }
 
+// TODO: Need better struct initialzer
 // NewWSClient creates and returns a new WSClient instance with the specified connection parameters.
-func NewWSClient(host, path, clientName string) *WSClient {
+func NewWSClient(host, path, clientName string, logger *zerolog.Logger) *WSClient {
 	return &WSClient{
 		host:       host,
 		path:       path,
 		clientName: clientName,
+		logger:     logger,
 	}
 }
 
@@ -49,41 +54,45 @@ func (c *WSClient) Connect() error {
 	}
 
 	c.conn = conn
-	log.Println("WebSocket connected:", u.String())
+	c.logger.Info().Msgf("Connection Established %s/%s", c.host, c.path)
 	return nil
-}
-
-// Send marshals and transmits a WsMessage over the WebSocket connection.
-// It returns an error if marshaling or sending fails.
-func (c *WSClient) Send(msg lib.WsMessage) error {
-	data, err := json.Marshal(msg)
-	if err != nil {
-		return err
-	}
-	return c.conn.WriteMessage(websocket.TextMessage, data)
 }
 
 // Receive continuously reads messages from the WebSocket connection and invokes the provided handler function.
 // It blocks until the connection is closed or an error occurs.
-func (c *WSClient) Receive(ctx context.Context, onMessage func(lib.Command), onError func(error)) {
+func (ws *WSClient) Start(ctx context.Context) {
 	for {
-		_, data, err := c.conn.ReadMessage()
-		if err != nil {
-			onError(err) // Happens when socket is closed or network error
-			return
-		}
-
-		var cmd lib.Command
-		if err := json.Unmarshal(data, &cmd); err != nil {
-			continue
-		}
-
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			onMessage(cmd) // Assuming NewHandler initializes a Handler with necessary dependencies
+			_, data, err := ws.conn.ReadMessage()
+			if err != nil {
+				ws.logger.Err(err).Msg("Read Error")
+				continue
+			}
 
+			var cmd lib.Command
+			if err := json.Unmarshal(data, &cmd); err != nil {
+				ws.logger.Err(err).Msg("Command Error")
+				continue
+			}
+
+			ws.logger.Info().Msgf("Request Recieved %s", cmd.CMD)
+			// Start processing
+			stream := ws.Dispatcher(ctx, cmd)
+
+			// handle stream in new go routine
+			go func() {
+				for msg := range stream {
+					//
+					str, err := json.Marshal(msg)
+					if err != nil {
+						ws.logger.Err(err).Msg("Marshal Error")
+					}
+					ws.conn.WriteMessage(websocket.TextMessage, str)
+				}
+			}()
 		}
 	}
 }
