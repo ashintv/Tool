@@ -1,61 +1,31 @@
 package main
 
 import (
-	"aetrix/observer/internals/agent/handler"
-	resource "aetrix/observer/internals/agent/monitor"
 	"aetrix/observer/internals/agent/websocket"
-	"aetrix/observer/internals/lib"
+	"aetrix/observer/internals/services"
 	"context"
-	"log"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
-
-	"github.com/docker/docker/client"
 )
 
 func main() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	if err != nil {
-		panic(err)
-	}
-	ws := websocket.NewWSClient("0.0.0.0:8080", "/agent", "agent-1")
-	handler := handler.NewHandler(cli)
-	err = ws.Connect()
-	if err != nil {
-		panic(err)
-	}
 
-	defer ws.Close()
-
-	// Start resource monitoring in a separate goroutine
-	go resource.StartResourceMonitor(ctx, ws, "agent-1", time.Second*3)
-
-	// Listen for incoming messages and route them to the appropriate handler
-	go ws.Receive(ctx, func(cmd lib.Command) {
-		response := websocket.MessageRouter(ctx, cmd, handler)
-		if err := ws.Send(response); err != nil {
-			log.Println("send error:", err)
-		}
-	},
-		func(err error) {
-			log.Println("receive error:", err)
-		},
+	ctx := context.Background()
+	dispatcher := websocket.NewDispatcher()
+	logger  := services.GetLogger()
+	client := websocket.NewWSClient(
+		"localhost:8080",
+		"agent",
+		"agent-001",
+		logger,
+		dispatcher.Dispatch,
 	)
 
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	err := client.Connect()
+	if err != nil {
+		logger.Error().Err(err).Msg("Failed to connect WebSocket client")
+		return
+	}
 
-	log.Println("Agent running. Press Ctrl+C to stop.")
+	client.Start(ctx)
 
-	<-sigCh
-	log.Println("Shuting down agent...")
-	cancel()
-	ws.Close()
-	time.Sleep(2 * time.Second) // Give some time for cleanup
-	log.Println("Agent stopped.")
 
 }

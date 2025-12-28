@@ -76,7 +76,7 @@ func TestStart(t *testing.T) {
 				},
 			},
 
-			Dispatcher: func(ctx context.Context, cmd lib.Command) <-chan interface{} {
+			Dispatch: func(ctx context.Context, cmd lib.Command) <-chan interface{} {
 				out := make(chan interface{})
 				go func() {
 					defer close(out)
@@ -108,7 +108,7 @@ func TestStart(t *testing.T) {
 					return 0, nil, errors.New("read failed")
 				},
 			},
-			Dispatcher: func(ctx context.Context, cmd lib.Command) <-chan interface{} {
+			Dispatch: func(ctx context.Context, cmd lib.Command) <-chan interface{} {
 				t.Fatal("dispatcher should not be called")
 				return nil
 			},
@@ -139,7 +139,7 @@ func TestStart(t *testing.T) {
 					return 0, nil, errors.New("read failed")
 				},
 			},
-			Dispatcher: func(ctx context.Context, cmd lib.Command) <-chan interface{} {
+			Dispatch: func(ctx context.Context, cmd lib.Command) <-chan interface{} {
 				t.Fatal("dispatcher should not be called")
 				return nil
 			},

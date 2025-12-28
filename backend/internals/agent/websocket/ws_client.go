@@ -25,17 +25,18 @@ type WSClient struct {
 	logger     *zerolog.Logger
 	conn       Conn
 	//TODO Need a better type
-	Dispatcher func(ctx context.Context, cmd lib.Command) <-chan interface{}
+	Dispatch func(ctx context.Context, cmd lib.Command) <-chan interface{}
 }
 
 // TODO: Need better struct initialzer
 // NewWSClient creates and returns a new WSClient instance with the specified connection parameters.
-func NewWSClient(host, path, clientName string, logger *zerolog.Logger) *WSClient {
+func NewWSClient(host, path, clientName string, logger *zerolog.Logger , dispatch func(ctx context.Context, cmd lib.Command) <-chan interface{}) *WSClient {
 	return &WSClient{
 		host:       host,
 		path:       path,
 		clientName: clientName,
 		logger:     logger,
+		Dispatch: dispatch,
 	}
 }
 
@@ -80,7 +81,7 @@ func (ws *WSClient) Start(ctx context.Context) {
 
 			ws.logger.Info().Msgf("Request Recieved %s", cmd.CMD)
 			// Start processing
-			stream := ws.Dispatcher(ctx, cmd)
+			stream := ws.Dispatch(ctx, cmd)
 
 			// handle stream in new go routine
 			go func() {
