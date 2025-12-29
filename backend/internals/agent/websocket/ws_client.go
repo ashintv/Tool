@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"aetrix/observer/internals/agent/protocol"
 	"aetrix/observer/internals/lib"
 	"context"
 	"encoding/json"
@@ -25,18 +26,20 @@ type WSClient struct {
 	logger     *zerolog.Logger
 	conn       Conn
 	//TODO Need a better type
-	Dispatch func(ctx context.Context, cmd lib.Command) <-chan interface{}
+	Dispatch func(ctx context.Context, cmd lib.Command) <-chan protocol.Event
 }
 
 // TODO: Need better struct initialzer
 // NewWSClient creates and returns a new WSClient instance with the specified connection parameters.
-func NewWSClient(host, path, clientName string, logger *zerolog.Logger , dispatch func(ctx context.Context, cmd lib.Command) <-chan interface{}) *WSClient {
+func NewWSClient(host, path, clientName string, logger *zerolog.Logger,
+	dispatch func(ctx context.Context, cmd lib.Command) <-chan protocol.Event,
+) *WSClient {
 	return &WSClient{
 		host:       host,
 		path:       path,
 		clientName: clientName,
 		logger:     logger,
-		Dispatch: dispatch,
+		Dispatch:   dispatch,
 	}
 }
 
@@ -86,8 +89,14 @@ func (ws *WSClient) Start(ctx context.Context) {
 			// handle stream in new go routine
 			go func() {
 				for msg := range stream {
-					//
-					str, err := json.Marshal(msg)
+					ws.logger.Info().Msgf("Sending Response for %s - %s", cmd.CMD , msg.Message)
+					wSmsg := lib.NewWsMessage(
+						lib.WithMessageType(lib.TypeResponse),
+						lib.WithMachineID(cmd.MachineID),
+						lib.WithPayloadData(msg.Data),
+						lib.WithPayloadError(msg.Error),
+					)
+					str, err := json.Marshal(wSmsg)
 					if err != nil {
 						ws.logger.Err(err).Msg("Marshal Error")
 					}

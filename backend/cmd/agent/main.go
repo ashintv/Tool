@@ -1,17 +1,27 @@
 package main
 
 import (
+	"aetrix/observer/internals/agent/runtime"
 	"aetrix/observer/internals/agent/websocket"
 	"aetrix/observer/internals/services"
 	"context"
+
+	"github.com/docker/docker/client"
 )
 
 func main() {
 
 	ctx := context.Background()
-	dispatcher := websocket.NewDispatcher()
-	logger  := services.GetLogger()
-	client := websocket.NewWSClient(
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		panic(err)
+	}
+
+	dockerRuntime := runtime.NewDockerRuntime(cli)
+	dispatcher := websocket.NewDispatcher(dockerRuntime)
+
+	logger := services.GetLogger()
+	wsCli := websocket.NewWSClient(
 		"localhost:8080",
 		"agent",
 		"agent-001",
@@ -19,13 +29,12 @@ func main() {
 		dispatcher.Dispatch,
 	)
 
-	err := client.Connect()
+	err = wsCli.Connect()
 	if err != nil {
 		logger.Error().Err(err).Msg("Failed to connect WebSocket client")
 		return
 	}
 
-	client.Start(ctx)
-
+	wsCli.Start(ctx)
 
 }

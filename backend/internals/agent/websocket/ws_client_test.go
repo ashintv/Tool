@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"aetrix/observer/internals/agent/protocol"
 	"aetrix/observer/internals/lib"
 	"context"
 	"encoding/json"
@@ -76,11 +77,13 @@ func TestStart(t *testing.T) {
 				},
 			},
 
-			Dispatch: func(ctx context.Context, cmd lib.Command) <-chan interface{} {
-				out := make(chan interface{})
+			Dispatch: func(ctx context.Context, cmd lib.Command) <-chan protocol.Event {
+				out := make(chan protocol.Event)
 				go func() {
 					defer close(out)
-					out <- "ok"
+					out <- protocol.NewEvent(
+						protocol.WithMessage("test message"),
+					)
 				}()
 				return out
 			},
@@ -108,7 +111,7 @@ func TestStart(t *testing.T) {
 					return 0, nil, errors.New("read failed")
 				},
 			},
-			Dispatch: func(ctx context.Context, cmd lib.Command) <-chan interface{} {
+			Dispatch: func(ctx context.Context, cmd lib.Command) <-chan protocol.Event {
 				t.Fatal("dispatcher should not be called")
 				return nil
 			},
@@ -139,7 +142,7 @@ func TestStart(t *testing.T) {
 					return 0, nil, errors.New("read failed")
 				},
 			},
-			Dispatch: func(ctx context.Context, cmd lib.Command) <-chan interface{} {
+			Dispatch: func(ctx context.Context, cmd lib.Command) <-chan protocol.Event {
 				t.Fatal("dispatcher should not be called")
 				return nil
 			},
