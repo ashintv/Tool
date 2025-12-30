@@ -4,6 +4,7 @@ import (
 	"aetrix/observer/internals/agent/protocol"
 	"aetrix/observer/internals/lib"
 	"bytes"
+
 	"io"
 
 	"context"
@@ -26,141 +27,158 @@ type Test struct {
 	expectedCount int
 }
 
-// func TestHandleListContainers(t *testing.T) {
+func TestListContainers(t *testing.T) {
 
-// 	// test cases with mock data
-// 	tests := []Test{
-// 		{
-// 			name: "Successful listing of containers",
-// 			mockClient: &docker.MockDockerClient{
-// 				ContainerListFn: func(ctx context.Context, options container.ListOptions) ([]container.Summary, error) {
-// 					return []container.Summary{
-// 						// returns more filled container summaries
-// 						{ID: "container1"},
-// 						{ID: "container2"},
-// 					}, nil
-// 				},
-// 			},
-// 			req: lib.Command{
-// 				CMD:       lib.LIST_CONTAINERS,
-// 				MachineID: "test-machine",
-// 			},
-// 			expectError:   false,
-// 			expectedCount: 2,
-// 		},
+	// test cases with mock data
+	tests := []Test{
+		{
+			name: "Successful listing of containers",
+			mockClient: &MockDockerClient{
+				ContainerListFn: func(ctx context.Context, options container.ListOptions) ([]container.Summary, error) {
+					return []container.Summary{
+						// returns more filled container summaries
+						{ID: "container1"},
+						{ID: "container2"},
+					}, nil
+				},
+			},
+			req: lib.Command{
+				CMD:       lib.LIST_CONTAINERS,
+				MachineID: "test-machine",
+			},
+			expectError:   false,
+			expectedCount: 2,
+		},
 
-// 		{
-// 			name: "Error listing containers",
-// 			mockClient: &docker.MockDockerClient{
-// 				ContainerListFn: func(ctx context.Context, options container.ListOptions) ([]container.Summary, error) {
-// 					return nil, fmt.Errorf("Failed to list")
-// 				},
-// 			},
-// 			req: lib.Command{
-// 				CMD:       lib.LIST_CONTAINERS,
-// 				MachineID: "test-machine",
-// 			},
-// 			expectError:   true,
-// 			expectedCount: 0,
-// 		},
+		{
+			name: "Error listing containers",
+			mockClient: &MockDockerClient{
+				ContainerListFn: func(ctx context.Context, options container.ListOptions) ([]container.Summary, error) {
+					return nil, fmt.Errorf("Failed to list")
+				},
+			},
+			req: lib.Command{
+				CMD:       lib.LIST_CONTAINERS,
+				MachineID: "test-machine",
+			},
+			expectError:   true,
+			expectedCount: 0,
+		},
 
-// 		{
-// 			name: "Test Options with All:true",
-// 			mockClient: &docker.MockDockerClient{
-// 				ContainerListFn: func(ctx context.Context, options container.ListOptions) ([]container.Summary, error) {
-// 					if !options.All {
-// 						return nil, fmt.Errorf(
-// 							"docker.ContainerList called with All=false; expected All=true from command params",
-// 						)
-// 					}
-// 					return []container.Summary{
-// 						{ID: "container", State: container.StateExited},
-// 						{ID: "container1", State: container.StateRunning},
-// 						{ID: "container2", State: container.StateRunning},
-// 					}, nil
-// 				},
-// 			},
-// 			req: lib.Command{
-// 				CMD:       lib.LIST_CONTAINERS,
-// 				MachineID: "test-machine",
-// 				Params: lib.Params{
-// 					ListContainersConfig: &lib.ListContainersConfig{
-// 						All: true,
-// 					},
-// 				},
-// 			},
-// 			expectError:   false,
-// 			expectedCount: 3,
-// 		},
+		{
+			name: "Test Options with All:true",
+			mockClient: &MockDockerClient{
+				ContainerListFn: func(ctx context.Context, options container.ListOptions) ([]container.Summary, error) {
+					if !options.All {
+						return nil, fmt.Errorf(
+							"docker.ContainerList called with All=false; expected All=true from command params",
+						)
+					}
+					return []container.Summary{
+						{ID: "container", State: container.StateExited},
+						{ID: "container1", State: container.StateRunning},
+						{ID: "container2", State: container.StateRunning},
+					}, nil
+				},
+			},
+			req: lib.Command{
+				CMD:       lib.LIST_CONTAINERS,
+				MachineID: "test-machine",
+				Params: lib.Params{
+					ListContainersConfig: &lib.ListContainersConfig{
+						All: true,
+					},
+				},
+			},
+			expectError:   false,
+			expectedCount: 3,
+		},
 
-// 		{
-// 			name: "Test Options with size:true",
-// 			mockClient: &docker.MockDockerClient{
-// 				ContainerListFn: func(ctx context.Context, options container.ListOptions) ([]container.Summary, error) {
-// 					if !options.Size {
-// 						return nil, fmt.Errorf(
-// 							"docker.ContainerList called with Size=false; expected Size=true from command params",
-// 						)
-// 					}
-// 					return []container.Summary{
-// 						{ID: "container", State: container.StateExited, SizeRootFs: 1233},
-// 						{ID: "container1", State: container.StateRunning, SizeRootFs: 1233},
-// 						{ID: "container2", State: container.StateRunning, SizeRootFs: 1233},
-// 					}, nil
-// 				},
-// 			},
-// 			req: lib.Command{
-// 				CMD:       lib.LIST_CONTAINERS,
-// 				MachineID: "test-machine",
-// 				Params: lib.Params{
-// 					ListContainersConfig: &lib.ListContainersConfig{
-// 						Size: true,
-// 					},
-// 				},
-// 			},
-// 			expectError:   false,
-// 			expectedCount: 3,
-// 		},
-// 	}
+		{
+			name: "Test Options with size:true",
+			mockClient: &MockDockerClient{
+				ContainerListFn: func(ctx context.Context, options container.ListOptions) ([]container.Summary, error) {
+					if !options.Size {
+						return nil, fmt.Errorf(
+							"docker.ContainerList called with Size=false; expected Size=true from command params",
+						)
+					}
+					return []container.Summary{
+						{ID: "container", State: container.StateExited, SizeRootFs: 1233},
+						{ID: "container1", State: container.StateRunning, SizeRootFs: 1233},
+						{ID: "container2", State: container.StateRunning, SizeRootFs: 1233},
+					}, nil
+				},
+			},
+			req: lib.Command{
+				CMD:       lib.LIST_CONTAINERS,
+				MachineID: "test-machine",
+				Params: lib.Params{
+					ListContainersConfig: &lib.ListContainersConfig{
+						Size: true,
+					},
+				},
+			},
+			expectError:   false,
+			expectedCount: 3,
+		},
+	}
 
-// 	// run tests
-// 	for _, tt := range tests {
-// 		tt := tt
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-// 			defer cancel()
+	// run tests
+	for _, tt := range tests {
+		tt := tt
+		var err error
+		var data interface{}
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
 
-// 			handler := NewHandler(tt.mockClient)
-// 			resp := handler.HandleListContainers(ctx, tt.req)
+			respChan := make(chan protocol.Event, 8)
 
-// 			if tt.expectError {
-// 				if resp.Payload.Error == nil {
-// 					t.Fatal("Error expected got no error")
-// 				}
-// 				return
-// 			}
+			dockerRuntime := NewDockerRuntime(tt.mockClient)
 
-// 			if !tt.expectError {
-// 				if resp.Payload.Error != nil {
-// 					t.Fatal("Error unexpected got no error")
-// 				}
-// 			}
+			go func() {
+				dockerRuntime.ListContainers(ctx, respChan, tt.req)
+				defer close(respChan)
 
-// 			containers, ok := resp.Payload.Data.([]container.Summary)
-// 			if !ok {
-// 				t.Fatalf("payload data is not []container.Summary")
-// 			}
-// 			if len(containers) != tt.expectedCount {
-// 				t.Fatalf("expected %d containers, got %d", tt.expectedCount, len(containers))
-// 			}
+			}()
 
-// 		})
+			for r := range respChan {
+				if r.Error != nil {
+					err = r.Error
+				}
 
-// 	}
+				if r.Data != nil {
+					data = r.Data
+				}
 
-// }
+			}
 
-func TestHandleStartNewContainer(t *testing.T) {
+			if tt.expectError {
+				if err == nil {
+					t.Fatal("Error expected got no error")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatal("Error unexpected got error")
+			}
+			
+			containers, ok := data.([]container.Summary)
+			if !ok {
+				t.Fatalf("payload data is not []container.Summary")
+			}
+			if len(containers) != tt.expectedCount {
+				t.Fatalf("expected %d containers, got %d", tt.expectedCount, len(containers))
+			}
+
+		})
+	}
+
+}
+
+func TestStartNewContainer(t *testing.T) {
 	tests := []Test{
 		{
 			name:        "Default",
@@ -355,11 +373,10 @@ func TestHandleStartNewContainer(t *testing.T) {
 			defer cancel()
 
 			respChan := make(chan protocol.Event, 8)
-
 			runtime := NewDockerRuntime(tt.mockClient)
 
 			//closing actually inside Dispatcher
-			go func ()  {
+			go func() {
 				runtime.StartNewContainer(ctx, respChan, tt.req)
 				defer close(respChan)
 			}()

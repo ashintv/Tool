@@ -128,25 +128,25 @@ func (R *DockerRuntime) StartNewContainer(ctx context.Context, ResWriter chan<- 
 // HandleListContainers retrieves and returns a list of Docker containers.
 // The context handles cancellation and timeout, and the request may include optional filters.
 // It returns a WsMessage containing the container list or an error message.
-// func (h *Handler) HandleListContainers(ctx context.Context, req lib.Command) lib.WsMessage {
-// 	wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
+func (h *DockerRuntime) ListContainers(ctx context.Context,ResWriter chan<- protocol.Event ,req lib.Command){
+	options := container.ListOptions{}
+	if req.Params.ListContainersConfig != nil {
+		options.All = req.Params.ListContainersConfig.All
+		options.Size = req.Params.ListContainersConfig.Size
+	}
 
-// 	options := container.ListOptions{}
-// 	if req.Params.ListContainersConfig != nil {
-// 		options.All = req.Params.ListContainersConfig.All
-// 		options.Size = req.Params.ListContainersConfig.Size
-// 	}
-
-// 	containers, err := h.dockerClient.ContainerList(ctx, options)
-// 	if err != nil {
-// 		wsMessage.Payload.Error = err.Error()
-// 		return wsMessage
-// 	}
-// 	wsMessage.Type = lib.TypeResponse
-// 	wsMessage.Payload.Data = containers
-// 	return wsMessage
-
-// }
+	containers, err := h.dockerClient.ContainerList(ctx, options)
+	if err != nil {
+		protocol.NewEvent(
+			protocol.WithError(err),
+		).Send(ctx, ResWriter)
+		return
+	}
+	protocol.NewEvent(
+		protocol.WithData(containers),
+		protocol.WithMessage("Listed containers successfully"),
+	).Send(ctx, ResWriter)
+}
 
 // HandleDeleteContainer removes a Docker container by its ID.
 // The context handles cancellation and timeout, and the request contains the container ID and removal options.
