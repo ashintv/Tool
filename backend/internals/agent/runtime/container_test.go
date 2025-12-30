@@ -1,29 +1,30 @@
 package runtime
 
-// import (
-// 	"aetrix/observer/internals/agent/docker"
-// 	"aetrix/observer/internals/lib"
-// 	"io"
+import (
+	"aetrix/observer/internals/agent/protocol"
+	"aetrix/observer/internals/lib"
+	"bytes"
+	"io"
 
-// 	"context"
-// 	"fmt"
-// 	"testing"
-// 	"time"
+	"context"
+	"fmt"
+	"testing"
+	"time"
 
-// 	"github.com/docker/docker/api/types/container"
-// 	"github.com/docker/docker/api/types/image"
-// 	"github.com/docker/docker/api/types/network"
-// 	"github.com/docker/go-connections/nat"
-// 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-// )
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/network"
+	"github.com/docker/go-connections/nat"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+)
 
-// type Test struct {
-// 	name          string
-// 	mockClient    *docker.MockDockerClient
-// 	req           lib.Command
-// 	expectError   bool
-// 	expectedCount int
-// }
+type Test struct {
+	name          string
+	mockClient    *MockDockerClient
+	req           lib.Command
+	expectError   bool
+	expectedCount int
+}
 
 // func TestHandleListContainers(t *testing.T) {
 
@@ -159,207 +160,236 @@ package runtime
 
 // }
 
-// func TestHandleStartNewContainer(t *testing.T) {
-// 	tests := []Test{
-// 		{
-// 			name:        "Default",
-// 			mockClient:  &docker.MockDockerClient{},
-// 			expectError: false,
-// 			req: lib.Command{
-// 				MachineID: "test-machine",
-// 				CMD:       lib.START_NEW_CONTAINER,
-// 				Params: lib.Params{
-// 					StartNewContainerConfig: &lib.StartNewContainerConfig{
-// 						Image:         "test-image",
-// 						ContainerPort: 8080,
-// 						HostPort:      8080,
-// 						Name:          "hello",
-// 					},
-// 				},
-// 			},
-// 		},
-// 		{
-// 			name: "Parameter testing",
-// 			mockClient: &docker.MockDockerClient{
-// 				ContainerStartFn: func(
-// 					ctx context.Context,
-// 					containerID string,
-// 					options container.StartOptions,
-// 				) error {
-// 					if containerID != "test_container" {
-// 						return fmt.Errorf(`expected container Id to be: "test_container" , got %s `, containerID)
-// 					}
-// 					return nil
-// 				},
-// 				ImagePullFn: func(
-// 					ctx context.Context,
-// 					ref string,
-// 					opts image.PullOptions,
-// 				) (io.ReadCloser, error) {
-// 					if ref == "test_image" {
-// 						return nil, nil
-// 					}
-// 					return nil, fmt.Errorf(`Expected image name to "test_image" but got %s`, ref)
-// 				},
-// 				ContainerCreateFn: func(ctx context.Context,
-// 					config *container.Config,
-// 					hostConfig *container.HostConfig,
-// 					networkingConfig *network.NetworkingConfig,
-// 					platform *v1.Platform, containerName string,
-// 				) (container.CreateResponse, error) {
+func TestHandleStartNewContainer(t *testing.T) {
+	tests := []Test{
+		{
+			name:        "Default",
+			mockClient:  &MockDockerClient{},
+			expectError: false,
+			req: lib.Command{
+				MachineID: "test-machine",
+				CMD:       lib.START_NEW_CONTAINER,
+				Params: lib.Params{
+					StartNewContainerConfig: &lib.StartNewContainerConfig{
+						Image:         "test-image",
+						ContainerPort: 8080,
+						HostPort:      8080,
+						Name:          "hello",
+					},
+				},
+			},
+		},
+		{
+			name: "Parameter testing",
+			mockClient: &MockDockerClient{
+				ContainerStartFn: func(
+					ctx context.Context,
+					containerID string,
+					options container.StartOptions,
+				) error {
+					if containerID != "test_container" {
+						return fmt.Errorf(
+							`expected container id "test_container", got %s`,
+							containerID,
+						)
+					}
+					return nil
+				},
+				ImagePullFn: func(
+					ctx context.Context,
+					ref string,
+					opts image.PullOptions,
+				) (io.ReadCloser, error) {
+					if ref != "test_image" {
+						return nil, fmt.Errorf(
+							`expected image "test_image", got %s`,
+							ref,
+						)
+					}
+					return io.NopCloser(bytes.NewBuffer(nil)), nil
+				},
+				ContainerCreateFn: func(
+					ctx context.Context,
+					config *container.Config,
+					hostConfig *container.HostConfig,
+					networkingConfig *network.NetworkingConfig,
+					platform *v1.Platform,
+					containerName string,
+				) (container.CreateResponse, error) {
 
-// 					if containerName != "test_container" {
-// 						return container.CreateResponse{}, fmt.Errorf(`Expected container name to be "test_container" but got %s`, containerName)
-// 					}
+					if containerName != "test_container" {
+						return container.CreateResponse{}, fmt.Errorf(
+							`expected container name "test_container", got %s`,
+							containerName,
+						)
+					}
 
-// 					ContainerPort := nat.Port("8080/tcp")
-// 					portBinding := nat.PortMap{
-// 						ContainerPort: []nat.PortBinding{
-// 							{
-// 								HostIP:   "tcp",
-// 								HostPort: "8080",
-// 							},
-// 						},
-// 					}
+					containerPort := nat.Port("8080/tcp")
+					expected := nat.PortMap{
+						containerPort: []nat.PortBinding{
+							{
+								HostIP:   "tcp",
+								HostPort: "8080",
+							},
+						},
+					}
 
-// 					if hostConfig.PortBindings[ContainerPort][0].HostIP != portBinding[ContainerPort][0].HostIP ||
-// 						hostConfig.PortBindings[ContainerPort][0].HostPort != portBinding[ContainerPort][0].HostPort {
-// 						return container.CreateResponse{}, fmt.Errorf(
-// 							`PortBindings do not match expected values expected: %v , got %v`, portBinding, hostConfig.PortBindings,
-// 						)
-// 					}
-// 					return container.CreateResponse{ID: "test_container"}, nil
-// 				},
-// 			},
-// 			expectError: false,
-// 			req: lib.Command{
-// 				MachineID: "test-machine",
-// 				CMD:       lib.START_NEW_CONTAINER,
-// 				Params: lib.Params{
-// 					StartNewContainerConfig: &lib.StartNewContainerConfig{
-// 						Image:         "test_image",
-// 						ContainerPort: 8080,
-// 						HostPort:      8080,
-// 						Protocol:      "tcp",
-// 						HostIP:        "tcp",
-// 						Name:          "test_container",
-// 					},
-// 				},
-// 			},
-// 		},
-// 		{
-// 			name: "Image pull failure",
-// 			mockClient: &docker.MockDockerClient{
-// 				ImagePullFn: func(
-// 					ctx context.Context,
-// 					ref string,
-// 					opts image.PullOptions,
-// 				) (io.ReadCloser, error) {
-// 					return nil, fmt.Errorf("Failed to pull image")
-// 				},
-// 			},
-// 			expectError: true,
-// 			req: lib.Command{
-// 				MachineID: "test-machine",
-// 				CMD:       lib.START_NEW_CONTAINER,
-// 				Params: lib.Params{
-// 					StartNewContainerConfig: &lib.StartNewContainerConfig{
-// 						Image:         "test-image",
-// 						ContainerPort: 8080,
-// 						HostPort:      8080,
-// 						Name:          "hello",
-// 					},
-// 				},
-// 			},
-// 		},
+					actual := hostConfig.PortBindings
 
-// 		{
-// 			name: "Container creation failure",
-// 			mockClient: &docker.MockDockerClient{
-// 				ContainerCreateFn: func(ctx context.Context,
-// 					config *container.Config,
-// 					hostConfig *container.HostConfig,
-// 					networkingConfig *network.NetworkingConfig,
-// 					platform *v1.Platform, containerName string,
-// 				) (container.CreateResponse, error) {
-// 					return container.CreateResponse{}, fmt.Errorf("Failed to create container")
-// 				},
-// 			},
-// 			expectError: true,
-// 			req: lib.Command{
-// 				MachineID: "test-machine",
-// 				CMD:       lib.START_NEW_CONTAINER,
-// 				Params: lib.Params{
-// 					StartNewContainerConfig: &lib.StartNewContainerConfig{
-// 						Image:         "test-image",
-// 						ContainerPort: 8080,
-// 						HostPort:      8080,
-// 						Name:          "hello",
-// 					},
-// 				},
-// 			},
-// 		},
-// 		{
-// 			name: "Container start failure",
-// 			mockClient: &docker.MockDockerClient{
-// 				ContainerStartFn: func(
-// 					ctx context.Context,
-// 					containerID string,
-// 					options container.StartOptions,
-// 				) error {
-// 					return fmt.Errorf("Failed to start container")
-// 				},
-// 			},
-// 			expectError: true,
-// 			req: lib.Command{
-// 				MachineID: "test-machine",
-// 				CMD:       lib.START_NEW_CONTAINER,
-// 				Params: lib.Params{
-// 					StartNewContainerConfig: &lib.StartNewContainerConfig{
-// 						Image:         "test-image",
-// 						ContainerPort: 8080,
-// 						HostPort:      8080,
-// 						Name:          "hello",
-// 					},
-// 				},
-// 			},
-// 		},
-// 	}
+					if actual[containerPort][0].HostIP != expected[containerPort][0].HostIP ||
+						actual[containerPort][0].HostPort != expected[containerPort][0].HostPort {
+						return container.CreateResponse{}, fmt.Errorf(
+							"port bindings mismatch, expected %v, got %v",
+							expected,
+							actual,
+						)
+					}
 
-// 	for _, tt := range tests {
-// 		tt := tt
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-// 			defer cancel()
+					return container.CreateResponse{ID: "test_container"}, nil
+				},
+			},
+			expectError: false,
+			req: lib.Command{
+				MachineID: "test-machine",
+				CMD:       lib.START_NEW_CONTAINER,
+				Params: lib.Params{
+					StartNewContainerConfig: &lib.StartNewContainerConfig{
+						Image:         "test_image",
+						ContainerPort: 8080,
+						HostPort:      8080,
+						Protocol:      "tcp",
+						HostIP:        "tcp",
+						Name:          "test_container",
+					},
+				},
+			},
+		},
+		{
+			name: "Image pull failure",
+			mockClient: &MockDockerClient{
+				ImagePullFn: func(
+					ctx context.Context,
+					ref string,
+					opts image.PullOptions,
+				) (io.ReadCloser, error) {
+					return nil, fmt.Errorf("failed to pull image")
+				},
+			},
+			expectError: true,
+			req: lib.Command{
+				MachineID: "test-machine",
+				CMD:       lib.START_NEW_CONTAINER,
+				Params: lib.Params{
+					StartNewContainerConfig: &lib.StartNewContainerConfig{
+						Image:         "test-image",
+						ContainerPort: 8080,
+						HostPort:      8080,
+						Name:          "hello",
+					},
+				},
+			},
+		},
+		{
+			name: "Container creation failure",
+			mockClient: &MockDockerClient{
+				ContainerCreateFn: func(
+					ctx context.Context,
+					config *container.Config,
+					hostConfig *container.HostConfig,
+					networkingConfig *network.NetworkingConfig,
+					platform *v1.Platform,
+					containerName string,
+				) (container.CreateResponse, error) {
+					return container.CreateResponse{}, fmt.Errorf("failed to create container")
+				},
+			},
+			expectError: true,
+			req: lib.Command{
+				MachineID: "test-machine",
+				CMD:       lib.START_NEW_CONTAINER,
+				Params: lib.Params{
+					StartNewContainerConfig: &lib.StartNewContainerConfig{
+						Image:         "test-image",
+						ContainerPort: 8080,
+						HostPort:      8080,
+						Name:          "hello",
+					},
+				},
+			},
+		},
+		{
+			name: "Container start failure",
+			mockClient: &MockDockerClient{
+				ContainerStartFn: func(
+					ctx context.Context,
+					containerID string,
+					options container.StartOptions,
+				) error {
+					return fmt.Errorf("failed to start container")
+				},
+			},
+			expectError: true,
+			req: lib.Command{
+				MachineID: "test-machine",
+				CMD:       lib.START_NEW_CONTAINER,
+				Params: lib.Params{
+					StartNewContainerConfig: &lib.StartNewContainerConfig{
+						Image:         "test-image",
+						ContainerPort: 8080,
+						HostPort:      8080,
+						Name:          "hello",
+					},
+				},
+			},
+		},
+	}
 
-// 			handler := NewHandler(tt.mockClient)
-// 			resp := handler.HandleStartNewContainer(ctx, tt.req)
+	for _, tt := range tests {
+		tt := tt
 
-// 			if tt.expectError {
-// 				if resp.Payload.Error == nil {
-// 					t.Fatal("Error expected got no error")
-// 				}
-// 				return
-// 			}
+		t.Run(tt.name, func(t *testing.T) {
+			var err error
+			var data interface{}
 
-// 			if !tt.expectError {
-// 				if resp.Payload.Error != nil {
-// 					t.Fatalf("Error unexpected got error: %s", resp.Payload.Error)
-// 				}
-// 			}
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
 
-// 			data, ok := resp.Payload.Data.(string)
-// 			if !ok {
-// 				t.Fatalf("payload data is not string")
-// 			}
-// 			expectedPrefix := "Container started successfully with ID: "
-// 			if len(data) <= len(expectedPrefix) || data[:len(expectedPrefix)] != expectedPrefix {
-// 				t.Fatalf("unexpected payload data: %s", data)
-// 			}
-// 		})
-// 	}
+			respChan := make(chan protocol.Event, 8)
 
-// }
+			runtime := NewDockerRuntime(tt.mockClient)
+
+			//closing actually inside Dispatcher
+			go func ()  {
+				runtime.StartNewContainer(ctx, respChan, tt.req)
+				defer close(respChan)
+			}()
+
+			for resp := range respChan {
+				if resp.Error != nil {
+					err = resp.Error
+				}
+				if resp.Data != nil {
+					data = resp.Data
+				}
+			}
+
+			if tt.expectError {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if data == nil {
+				t.Fatal("expected data, got nil")
+			}
+		})
+	}
+}
 
 // func TestHandleDeleteContainer(t *testing.T) {
 // 	tests := []Test{
