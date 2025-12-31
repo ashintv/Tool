@@ -534,85 +534,99 @@ func TestDeleteContainer(t *testing.T) {
 	}
 }
 
-// func TestHandleStopContainer(t *testing.T) {
-// 	tests := []Test{
-// 		{
-// 			name: "Successful stopping of container",
-// 			mockClient: &docker.MockDockerClient{
-// 				ContainerStopFn: func(
-// 					ctx context.Context,
-// 					containerID string,
-// 					options container.StopOptions,
-// 				) error {
-// 					if containerID != "test_container" {
-// 						return fmt.Errorf(`expected container Id to be: "test_container" , got %s `, containerID)
-// 					}
-// 					return nil
-// 				},
-// 			},
-// 			req: lib.Command{
-// 				CMD:         lib.STOP_CONTAINER,
-// 				MachineID:   "test-machine",
-// 				ContainerID: "test_container",
-// 			},
-// 			expectError: false,
-// 		},
-// 		{
-// 			name: "Error stopping container",
-// 			mockClient: &docker.MockDockerClient{
-// 				ContainerStopFn: func(
-// 					ctx context.Context,
-// 					containerID string,
-// 					options container.StopOptions,
-// 				) error {
-// 					return fmt.Errorf("Failed to stop")
-// 				},
-// 			},
-// 			req: lib.Command{
-// 				CMD:         lib.STOP_CONTAINER,
-// 				MachineID:   "test-machine",
-// 				ContainerID: "test_container",
-// 			},
-// 			expectError: true,
-// 		},
-// 	}
+func TestStopContainer(t *testing.T) {
+	tests := []Test{
+		{
+			name: "Successful stopping of container",
+			mockClient: &MockDockerClient{
+				ContainerStopFn: func(
+					ctx context.Context,
+					containerID string,
+					options container.StopOptions,
+				) error {
+					if containerID != "test_container" {
+						return fmt.Errorf(`expected container Id to be: "test_container" , got %s `, containerID)
+					}
+					return nil
+				},
+			},
+			req: lib.Command{
+				CMD:         lib.STOP_CONTAINER,
+				MachineID:   "test-machine",
+				ContainerID: "test_container",
+			},
+			expectError: false,
+		},
+		{
+			name: "Error stopping container",
+			mockClient: &MockDockerClient{
+				ContainerStopFn: func(
+					ctx context.Context,
+					containerID string,
+					options container.StopOptions,
+				) error {
+					return fmt.Errorf("Failed to stop")
+				},
+			},
+			req: lib.Command{
+				CMD:         lib.STOP_CONTAINER,
+				MachineID:   "test-machine",
+				ContainerID: "test_container",
+			},
+			expectError: true,
+		},
+	}
 
-// 	for _, tt := range tests {
-// 		tt := tt
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-// 			defer cancel()
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
 
-// 			handler := NewHandler(tt.mockClient)
-// 			resp := handler.HandleStopContainer(ctx, tt.req)
+			runt := NewDockerRuntime(tt.mockClient)
+			respChan := make(chan protocol.Event, 8)
+			go func() {
+				defer close(respChan)
+				runt.StopContainer(ctx, respChan, tt.req)
 
-// 			if tt.expectError {
-// 				if resp.Payload.Error == nil {
-// 					t.Fatal("Error expected got no error")
-// 				}
-// 				return
-// 			}
+			}()
 
-// 			if !tt.expectError {
-// 				if resp.Payload.Error != nil {
-// 					t.Fatalf("Error unexpected got error: %s", resp.Payload.Error)
-// 				}
-// 				return
-// 			}
+			var err error
+			var data interface{}
 
-// 			data, ok := resp.Payload.Data.(string)
-// 			if !ok {
-// 				t.Fatalf("payload data is not string")
-// 				return
-// 			}
-// 			expectedMessage := "Container stopped successfully"
-// 			if data != expectedMessage {
-// 				t.Fatalf("expected payload data: %s, got: %s", expectedMessage, data)
-// 			}
+			for resp := range respChan {
 
-// 		})
-// 	}
-// }
+				if resp.Error != nil {
+					err = resp.Error
+				}
+
+				if resp.Data != nil {
+					data = resp.Data
+				}
+			}
+
+			if tt.expectError {
+				if err == nil {
+					t.Fatal("Error expected got no error")
+				}
+				return
+			}
+
+			if !tt.expectError {
+				if err != nil {
+					t.Fatalf("Error unexpected got error: %s", err)
+				}
+				return
+			}
+
+			if data == nil {
+				t.Fatalf("data not found")
+				return
+			}
+
+		})
+	}
+}
 
 // func TestHandleRestartContainer(t *testing.T) {
 // 	tests := []Test{

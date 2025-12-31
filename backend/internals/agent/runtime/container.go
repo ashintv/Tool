@@ -11,6 +11,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
+
 )
 
 type DockerRuntimeInterface interface {
@@ -164,7 +165,7 @@ func (R *DockerRuntime) DeleteContainer(ctx context.Context, ResWriter chan<- pr
 	if err != nil {
 		protocol.NewEvent(
 			protocol.WithError(err),
-		).Send(ctx , ResWriter)
+		).Send(ctx, ResWriter)
 		return
 	}
 
@@ -175,24 +176,32 @@ func (R *DockerRuntime) DeleteContainer(ctx context.Context, ResWriter chan<- pr
 		}{
 			ID: req.ContainerID,
 		}),
-	).Send(ctx , ResWriter)
+	).Send(ctx, ResWriter)
 }
 
-// func (h *Handler) HandleStopContainer(ctx context.Context, req lib.Command) lib.WsMessage {
-// 	wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
-// 	fmt.Println("Processing STOP_CONTAINER command for ContainerID:", req.ContainerID)
+func (R *DockerRuntime) StopContainer(ctx context.Context, ResWriter chan<- protocol.Event, req lib.Command) {
+	// Using a timeout of 5 seconds for stopping the container
+	// overrides the default 10 seconds
+	timeout := 5 // seconds
+	err := R.dockerClient.ContainerStop(ctx, req.ContainerID, container.StopOptions{Timeout: &timeout})
+	if err != nil {
+		protocol.NewEvent(
+			protocol.WithError(err),
+		).Send(ctx, ResWriter)
+		return
+	}
 
-// 	// Using a timeout of 5 seconds for stopping the container
-// 	// overrides the default 10 seconds
-// 	timeout := 5 // seconds
-// 	err := h.dockerClient.ContainerStop(ctx, req.ContainerID, container.StopOptions{Timeout: &timeout})
-// 	if err != nil {
-// 		wsMessage.Payload.Error = err.Error()
-// 		return wsMessage
-// 	}
-// 	wsMessage.Payload.Data = "Container " + req.ContainerID + " stopped successfully"
-// 	return wsMessage
-// }
+	data := struct {
+		Id string
+	}{
+		Id: req.ContainerID,
+	}
+
+	protocol.NewEvent(
+		protocol.WithMessage("Container stoped successfully"),
+		protocol.WithData(data),
+	).Send(ctx, ResWriter)
+}
 
 // HandleRestartContainer restarts a Docker container by its ID.
 // The context handles cancellation and timeout, and an immediate restart (timeout=0) is performed.
