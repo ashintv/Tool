@@ -5,12 +5,11 @@ import (
 	"aetrix/observer/internals/lib"
 	"context"
 	"fmt"
-	"io"
-
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
+	"io"
 )
 
 type DockerRuntimeInterface interface {
@@ -202,46 +201,44 @@ func (R *DockerRuntime) StopContainer(ctx context.Context, ResWriter chan<- prot
 	).Send(ctx, ResWriter)
 }
 
-
 // timeout of one second (ie it take one second btw starting and stoping)
-func (R * DockerRuntime ) RestartContainer(ctx context.Context,resWriter chan<- protocol.Event  , req lib.Command){
+func (R *DockerRuntime) RestartContainer(ctx context.Context, resWriter chan<- protocol.Event, req lib.Command) {
 
 	timeout := 1 // immediate restart
 	err := R.dockerClient.ContainerRestart(ctx, req.ContainerID, container.StopOptions{Timeout: &timeout})
 	if err != nil {
 		protocol.NewEvent(
 			protocol.WithError(err),
-		).Send(ctx , resWriter)
+		).Send(ctx, resWriter)
 
 		return
 	}
-	data:= struct{
+	data := struct {
 		Id string
 	}{
-		Id : req.ContainerID,
+		Id: req.ContainerID,
 	}
 	protocol.NewEvent(
 		protocol.WithData(data),
 		protocol.WithMessage("Container restarted successfully"),
-	).Send(ctx , resWriter)
+	).Send(ctx, resWriter)
 }
 
-
-func (R *DockerRuntime) StartContainer(ctx context.Context, resWirter chan<- protocol.Event, req lib.Command){
+func (R *DockerRuntime) StartContainer(ctx context.Context, resWirter chan<- protocol.Event, req lib.Command) {
 	err := R.dockerClient.ContainerStart(ctx, req.ContainerID, container.StartOptions{})
 	if err != nil {
 		protocol.NewEvent(
 			protocol.WithError(err),
-		).Send(ctx , resWirter)
+		).Send(ctx, resWirter)
 		return
 	}
-	data:= struct{
+	data := struct {
 		Id string
 	}{
-		Id : req.ContainerID,
+		Id: req.ContainerID,
 	}
 	protocol.NewEvent(
 		protocol.WithData(data),
 		protocol.WithMessage("Container started suceesfully"),
-	).Send(ctx , resWirter)
+	).Send(ctx, resWirter)
 }

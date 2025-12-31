@@ -4,19 +4,16 @@ import (
 	"aetrix/observer/internals/agent/protocol"
 	"aetrix/observer/internals/lib"
 	"bytes"
-
-	"io"
-
 	"context"
 	"fmt"
-	"testing"
-	"time"
-
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"io"
+	"testing"
+	"time"
 )
 
 type Test struct {
