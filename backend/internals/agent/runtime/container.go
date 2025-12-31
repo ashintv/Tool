@@ -32,7 +32,7 @@ func NewDockerRuntime(dockerClient DockerClient) *DockerRuntime {
 // pull image ,creates container , start
 func (R *DockerRuntime) StartNewContainer(ctx context.Context, ResWriter chan<- protocol.Event, req lib.Command) {
 	StartConfig := req.Params.StartNewContainerConfig
-	fmt.Println("rec" , req)
+	fmt.Println("rec", req)
 	// 1. Pull the Docker image
 	imageName := StartConfig.Image
 
@@ -128,14 +128,14 @@ func (R *DockerRuntime) StartNewContainer(ctx context.Context, ResWriter chan<- 
 // HandleListContainers retrieves and returns a list of Docker containers.
 // The context handles cancellation and timeout, and the request may include optional filters.
 // It returns a WsMessage containing the container list or an error message.
-func (h *DockerRuntime) ListContainers(ctx context.Context,ResWriter chan<- protocol.Event ,req lib.Command){
+func (R *DockerRuntime) ListContainers(ctx context.Context, ResWriter chan<- protocol.Event, req lib.Command) {
 	options := container.ListOptions{}
 	if req.Params.ListContainersConfig != nil {
 		options.All = req.Params.ListContainersConfig.All
 		options.Size = req.Params.ListContainersConfig.Size
 	}
 
-	containers, err := h.dockerClient.ContainerList(ctx, options)
+	containers, err := R.dockerClient.ContainerList(ctx, options)
 	if err != nil {
 		protocol.NewEvent(
 			protocol.WithError(err),
@@ -150,31 +150,34 @@ func (h *DockerRuntime) ListContainers(ctx context.Context,ResWriter chan<- prot
 
 // HandleDeleteContainer removes a Docker container by its ID.
 // The context handles cancellation and timeout, and the request contains the container ID and removal options.
-// It returns a WsMessage with a success confirmation or an error message.
-// func (h *Handler) HandleDeleteContainer(ctx context.Context, req lib.Command) lib.WsMessage {
-// 	wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
-// 	configs := req.Params.DeleteContainerConfig
+func (R *DockerRuntime) DeleteContainer(ctx context.Context, ResWriter chan<- protocol.Event, req lib.Command) {
+	configs := req.Params.DeleteContainerConfig
+	options := container.RemoveOptions{}
+	if configs != nil {
+		options.Force = configs.Force
+		options.RemoveVolumes = configs.Volume
+		options.RemoveLinks = configs.Links
+	} else {
+		options.Force = true
+	}
+	err := R.dockerClient.ContainerRemove(ctx, req.ContainerID, options)
+	if err != nil {
+		protocol.NewEvent(
+			protocol.WithError(err),
+		).Send(ctx , ResWriter)
+		return
+	}
 
-// 	options := container.RemoveOptions{}
-// 	if configs != nil {
-// 		options.Force = configs.Force
-// 		options.RemoveVolumes = configs.Volume
-// 		options.RemoveLinks = configs.Links
-// 	} else {
-// 		options.Force = true
-// 	}
-// 	err := h.dockerClient.ContainerRemove(ctx, req.ContainerID, options)
-// 	if err != nil {
-// 		wsMessage.Payload.Error = err.Error()
-// 		return wsMessage
-// 	}
-// 	wsMessage.Payload.Data = "Container " + req.ContainerID + " deleted successfully"
-// 	return wsMessage
-// }
+	protocol.NewEvent(
+		protocol.WithMessage("Cotainer deleted successfully"),
+		protocol.WithData(struct {
+			ID string
+		}{
+			ID: req.ContainerID,
+		}),
+	).Send(ctx , ResWriter)
+}
 
-// HandleStopContainer stops a running Docker container by its ID.
-// The context handles cancellation and timeout, and a 5-second timeout is used for graceful shutdown.
-// It returns a WsMessage with a success confirmation or an error message.
 // func (h *Handler) HandleStopContainer(ctx context.Context, req lib.Command) lib.WsMessage {
 // 	wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
 // 	fmt.Println("Processing STOP_CONTAINER command for ContainerID:", req.ContainerID)
