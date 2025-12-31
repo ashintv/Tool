@@ -203,22 +203,29 @@ func (R *DockerRuntime) StopContainer(ctx context.Context, ResWriter chan<- prot
 	).Send(ctx, ResWriter)
 }
 
-// HandleRestartContainer restarts a Docker container by its ID.
-// The context handles cancellation and timeout, and an immediate restart (timeout=0) is performed.
-// It returns a WsMessage with a success confirmation or an error message.
-// func (h *Handler) HandleRestartContainer(ctx context.Context, req lib.Command) lib.WsMessage {
-// 	wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
-// 	log.Println("Processing RESTART_CONTAINER command for ContainerID:", req.ContainerID)
-// 	timeout := 0 // immediate restart
-// 	err := h.dockerClient.ContainerRestart(ctx, req.ContainerID, container.StopOptions{Timeout: &timeout})
-// 	if err != nil {
-// 		wsMessage.Payload.Error = err.Error()
-// 		return wsMessage
-// 	}
-// 	wsMessage.Payload.Data = "Container " + req.ContainerID + " restarted successfully"
 
-// 	return wsMessage
-// }
+// timeout of one second (ie it take one second btw starting and stoping)
+func (R * DockerRuntime ) RestartContainer(ctx context.Context,resWriter chan<- protocol.Event  , req lib.Command){
+
+	timeout := 1 // immediate restart
+	err := R.dockerClient.ContainerRestart(ctx, req.ContainerID, container.StopOptions{Timeout: &timeout})
+	if err != nil {
+		protocol.NewEvent(
+			protocol.WithError(err),
+		).Send(ctx , resWriter)
+
+		return
+	}
+	data:= struct{
+		Id string
+	}{
+		Id : req.ContainerID,
+	}
+	protocol.NewEvent(
+		protocol.WithData(data),
+		protocol.WithMessage("Container restarted successfully"),
+	).Send(ctx , resWriter)
+}
 
 // HandleStartContainer starts a stopped Docker container by its ID.
 // The context handles cancellation and timeout, and it starts an existing container (not creating a new one).
