@@ -11,7 +11,6 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
-
 )
 
 type DockerRuntimeInterface interface {
@@ -227,17 +226,22 @@ func (R * DockerRuntime ) RestartContainer(ctx context.Context,resWriter chan<- 
 	).Send(ctx , resWriter)
 }
 
-// HandleStartContainer starts a stopped Docker container by its ID.
-// The context handles cancellation and timeout, and it starts an existing container (not creating a new one).
-// It returns a WsMessage with a success confirmation or an error message.
-// func (h *Handler) HandleStartContainer(ctx context.Context, req lib.Command) lib.WsMessage {
-// 	wsMessage := lib.NewWsMessage(lib.TypeResponse, req.MachineID, lib.PayloadType{})
-// 	log.Println("Processing START_CONTAINER command for ContainerID:", req.ContainerID)
-// 	err := h.dockerClient.ContainerStart(ctx, req.ContainerID, container.StartOptions{})
-// 	if err != nil {
-// 		wsMessage.Payload.Error = err.Error()
-// 		return wsMessage
-// 	}
-// 	wsMessage.Payload.Data = "Container " + req.ContainerID + " started successfully"
-// 	return wsMessage
-// }
+
+func (R *DockerRuntime) StartContainer(ctx context.Context, resWirter chan<- protocol.Event, req lib.Command){
+	err := R.dockerClient.ContainerStart(ctx, req.ContainerID, container.StartOptions{})
+	if err != nil {
+		protocol.NewEvent(
+			protocol.WithError(err),
+		).Send(ctx , resWirter)
+		return
+	}
+	data:= struct{
+		Id string
+	}{
+		Id : req.ContainerID,
+	}
+	protocol.NewEvent(
+		protocol.WithData(data),
+		protocol.WithMessage("Container started suceesfully"),
+	).Send(ctx , resWirter)
+}

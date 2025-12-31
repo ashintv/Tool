@@ -721,82 +721,94 @@ func TestRestartContainer(t *testing.T) {
 	}
 }
 
-// func TestHandleStartContainer(t *testing.T) {
-// 	tests := []Test{
-// 		{
-// 			name: "Successful starting of container",
-// 			mockClient: &docker.MockDockerClient{
-// 				ContainerStartFn: func(
-// 					ctx context.Context,
-// 					containerID string,
-// 					options container.StartOptions,
-// 				) error {
-// 					if containerID != "test_container" {
-// 						return fmt.Errorf(`expected container Id to be: "test_container" , got %s `, containerID)
-// 					}
-// 					return nil
-// 				},
-// 			},
-// 			req: lib.Command{
-// 				CMD:         lib.START_CONTAINER,
-// 				MachineID:   "test-machine",
-// 				ContainerID: "test_container",
-// 			},
-// 			expectError: false,
-// 		},
-// 		{
-// 			name: "Error starting container",
-// 			mockClient: &docker.MockDockerClient{
-// 				ContainerStartFn: func(
-// 					ctx context.Context,
-// 					containerID string,
-// 					options container.StartOptions,
-// 				) error {
-// 					return fmt.Errorf("Failed to start")
-// 				},
-// 			},
-// 			req: lib.Command{
-// 				CMD:         lib.START_CONTAINER,
-// 				MachineID:   "test-machine",
-// 				ContainerID: "test_container",
-// 			},
-// 			expectError: true,
-// 		},
-// 	}
+func TestStartContainer(t *testing.T) {
+	tests := []Test{
+		{
+			name: "Successful starting of container",
+			mockClient: &MockDockerClient{
+				ContainerStartFn: func(
+					ctx context.Context,
+					containerID string,
+					options container.StartOptions,
+				) error {
+					if containerID != "test_container" {
+						return fmt.Errorf(`expected container Id to be: "test_container" , got %s `, containerID)
+					}
+					return nil
+				},
+			},
+			req: lib.Command{
+				CMD:         lib.START_CONTAINER,
+				MachineID:   "test-machine",
+				ContainerID: "test_container",
+			},
+			expectError: false,
+		},
+		{
+			name: "Error starting container",
+			mockClient: &MockDockerClient{
+				ContainerStartFn: func(
+					ctx context.Context,
+					containerID string,
+					options container.StartOptions,
+				) error {
+					return fmt.Errorf("Failed to start")
+				},
+			},
+			req: lib.Command{
+				CMD:         lib.START_CONTAINER,
+				MachineID:   "test-machine",
+				ContainerID: "test_container",
+			},
+			expectError: true,
+		},
+	}
 
-// 	for _, tt := range tests {
-// 		tt := tt
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-// 			defer cancel()
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
 
-// 			handler := NewHandler(tt.mockClient)
-// 			resp := handler.HandleStartContainer(ctx, tt.req)
+			runt := NewDockerRuntime(tt.mockClient)
+			resChan := make(chan protocol.Event, 8)
 
-// 			if tt.expectError {
-// 				if resp.Payload.Error == nil {
-// 					t.Fatal("Error expected got no error")
-// 				}
-// 				return
-// 			}
+			go func() {
+				defer close(resChan)
+				runt.StartContainer(ctx, resChan, tt.req)
+			}()
 
-// 			if !tt.expectError {
-// 				if resp.Payload.Error != nil {
-// 					t.Fatalf("Error unexpected got error: %s", resp.Payload.Error)
-// 				}
-// 				return
-// 			}
+			var err error
+			var data interface{}
 
-// 			data, ok := resp.Payload.Data.(string)
-// 			if !ok {
-// 				t.Fatalf("payload data is not string")
-// 				return
-// 			}
-// 			expectedMessage := "Container started successfully"
-// 			if data != expectedMessage {
-// 				t.Fatalf("expected payload data: %s, got: %s", expectedMessage, data)
-// 			}
+			for resp := range resChan {
+				if resp.Data != nil {
+					data = resp.Data
+				}
 
-// 		})
-// 	}
-// }
+				if resp.Error != nil {
+					err = resp.Error
+				}
+			}
+
+			if tt.expectError {
+				if err == nil {
+					t.Fatal("Error expected got no error")
+				}
+				return
+			}
+
+			if !tt.expectError {
+				if err != nil {
+					t.Fatalf("Error unexpected got error: %s", err)
+				}
+				return
+			}
+
+			if data == nil {
+				t.Fatalf("payload data is not string")
+				return
+			}
+		})
+	}
+}
