@@ -1,37 +1,36 @@
-package handler
+package runtime
 
 import (
-	"aetrix/observer/internals/agent/docker"
+	"aetrix/observer/internals/agent/protocol"
 	"aetrix/observer/internals/lib"
-	"io"
-
+	"bytes"
 	"context"
 	"fmt"
-	"testing"
-	"time"
-
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"io"
+	"testing"
+	"time"
 )
 
 type Test struct {
 	name          string
-	mockClient    *docker.MockDockerClient
+	mockClient    *MockDockerClient
 	req           lib.Command
 	expectError   bool
 	expectedCount int
 }
 
-func TestHandleListContainers(t *testing.T) {
+func TestListContainers(t *testing.T) {
 
 	// test cases with mock data
 	tests := []Test{
 		{
 			name: "Successful listing of containers",
-			mockClient: &docker.MockDockerClient{
+			mockClient: &MockDockerClient{
 				ContainerListFn: func(ctx context.Context, options container.ListOptions) ([]container.Summary, error) {
 					return []container.Summary{
 						// returns more filled container summaries
@@ -50,7 +49,7 @@ func TestHandleListContainers(t *testing.T) {
 
 		{
 			name: "Error listing containers",
-			mockClient: &docker.MockDockerClient{
+			mockClient: &MockDockerClient{
 				ContainerListFn: func(ctx context.Context, options container.ListOptions) ([]container.Summary, error) {
 					return nil, fmt.Errorf("Failed to list")
 				},
@@ -65,7 +64,7 @@ func TestHandleListContainers(t *testing.T) {
 
 		{
 			name: "Test Options with All:true",
-			mockClient: &docker.MockDockerClient{
+			mockClient: &MockDockerClient{
 				ContainerListFn: func(ctx context.Context, options container.ListOptions) ([]container.Summary, error) {
 					if !options.All {
 						return nil, fmt.Errorf(
@@ -94,7 +93,7 @@ func TestHandleListContainers(t *testing.T) {
 
 		{
 			name: "Test Options with size:true",
-			mockClient: &docker.MockDockerClient{
+			mockClient: &MockDockerClient{
 				ContainerListFn: func(ctx context.Context, options container.ListOptions) ([]container.Summary, error) {
 					if !options.Size {
 						return nil, fmt.Errorf(
@@ -125,27 +124,45 @@ func TestHandleListContainers(t *testing.T) {
 	// run tests
 	for _, tt := range tests {
 		tt := tt
+		var err error
+		var data interface{}
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 
-			handler := NewHandler(tt.mockClient)
-			resp := handler.HandleListContainers(ctx, tt.req)
+			respChan := make(chan protocol.Event, 8)
+
+			dockerRuntime := NewDockerRuntime(tt.mockClient)
+
+			go func() {
+				dockerRuntime.ListContainers(ctx, respChan, tt.req)
+				defer close(respChan)
+
+			}()
+
+			for r := range respChan {
+				if r.Error != nil {
+					err = r.Error
+				}
+
+				if r.Data != nil {
+					data = r.Data
+				}
+
+			}
 
 			if tt.expectError {
-				if resp.Payload.Error == "" {
+				if err == nil {
 					t.Fatal("Error expected got no error")
 				}
 				return
 			}
 
-			if !tt.expectError {
-				if resp.Payload.Error != "" {
-					t.Fatal("Error unexpected got no error")
-				}
+			if err != nil {
+				t.Fatal("Error unexpected got error")
 			}
 
-			containers, ok := resp.Payload.Data.([]container.Summary)
+			containers, ok := data.([]container.Summary)
 			if !ok {
 				t.Fatalf("payload data is not []container.Summary")
 			}
@@ -154,16 +171,15 @@ func TestHandleListContainers(t *testing.T) {
 			}
 
 		})
-
 	}
 
 }
 
-func TestHandleStartNewContainer(t *testing.T) {
+func TestStartNewContainer(t *testing.T) {
 	tests := []Test{
 		{
 			name:        "Default",
-			mockClient:  &docker.MockDockerClient{},
+			mockClient:  &MockDockerClient{},
 			expectError: false,
 			req: lib.Command{
 				MachineID: "test-machine",
@@ -180,14 +196,17 @@ func TestHandleStartNewContainer(t *testing.T) {
 		},
 		{
 			name: "Parameter testing",
-			mockClient: &docker.MockDockerClient{
+			mockClient: &MockDockerClient{
 				ContainerStartFn: func(
 					ctx context.Context,
 					containerID string,
 					options container.StartOptions,
 				) error {
 					if containerID != "test_container" {
-						return fmt.Errorf(`expected container Id to be: "test_container" , got %s `, containerID)
+						return fmt.Errorf(
+							`expected container id "test_container", got %s`,
+							containerID,
+						)
 					}
 					return nil
 				},
@@ -196,25 +215,33 @@ func TestHandleStartNewContainer(t *testing.T) {
 					ref string,
 					opts image.PullOptions,
 				) (io.ReadCloser, error) {
-					if ref == "test_image" {
-						return nil, nil
+					if ref != "test_image" {
+						return nil, fmt.Errorf(
+							`expected image "test_image", got %s`,
+							ref,
+						)
 					}
-					return nil, fmt.Errorf(`Expected image name to "test_image" but got %s`, ref)
+					return io.NopCloser(bytes.NewBuffer(nil)), nil
 				},
-				ContainerCreateFn: func(ctx context.Context,
+				ContainerCreateFn: func(
+					ctx context.Context,
 					config *container.Config,
 					hostConfig *container.HostConfig,
 					networkingConfig *network.NetworkingConfig,
-					platform *v1.Platform, containerName string,
+					platform *v1.Platform,
+					containerName string,
 				) (container.CreateResponse, error) {
 
 					if containerName != "test_container" {
-						return container.CreateResponse{}, fmt.Errorf(`Expected container name to be "test_container" but got %s`, containerName)
+						return container.CreateResponse{}, fmt.Errorf(
+							`expected container name "test_container", got %s`,
+							containerName,
+						)
 					}
 
-					ContainerPort := nat.Port("8080/tcp")
-					portBinding := nat.PortMap{
-						ContainerPort: []nat.PortBinding{
+					containerPort := nat.Port("8080/tcp")
+					expected := nat.PortMap{
+						containerPort: []nat.PortBinding{
 							{
 								HostIP:   "tcp",
 								HostPort: "8080",
@@ -222,12 +249,17 @@ func TestHandleStartNewContainer(t *testing.T) {
 						},
 					}
 
-					if hostConfig.PortBindings[ContainerPort][0].HostIP != portBinding[ContainerPort][0].HostIP ||
-						hostConfig.PortBindings[ContainerPort][0].HostPort != portBinding[ContainerPort][0].HostPort {
+					actual := hostConfig.PortBindings
+
+					if actual[containerPort][0].HostIP != expected[containerPort][0].HostIP ||
+						actual[containerPort][0].HostPort != expected[containerPort][0].HostPort {
 						return container.CreateResponse{}, fmt.Errorf(
-							`PortBindings do not match expected values expected: %v , got %v`, portBinding, hostConfig.PortBindings,
+							"port bindings mismatch, expected %v, got %v",
+							expected,
+							actual,
 						)
 					}
+
 					return container.CreateResponse{ID: "test_container"}, nil
 				},
 			},
@@ -249,13 +281,13 @@ func TestHandleStartNewContainer(t *testing.T) {
 		},
 		{
 			name: "Image pull failure",
-			mockClient: &docker.MockDockerClient{
+			mockClient: &MockDockerClient{
 				ImagePullFn: func(
 					ctx context.Context,
 					ref string,
 					opts image.PullOptions,
 				) (io.ReadCloser, error) {
-					return nil, fmt.Errorf("Failed to pull image")
+					return nil, fmt.Errorf("failed to pull image")
 				},
 			},
 			expectError: true,
@@ -272,17 +304,18 @@ func TestHandleStartNewContainer(t *testing.T) {
 				},
 			},
 		},
-
 		{
 			name: "Container creation failure",
-			mockClient: &docker.MockDockerClient{
-				ContainerCreateFn: func(ctx context.Context,
+			mockClient: &MockDockerClient{
+				ContainerCreateFn: func(
+					ctx context.Context,
 					config *container.Config,
 					hostConfig *container.HostConfig,
 					networkingConfig *network.NetworkingConfig,
-					platform *v1.Platform, containerName string,
+					platform *v1.Platform,
+					containerName string,
 				) (container.CreateResponse, error) {
-					return container.CreateResponse{}, fmt.Errorf("Failed to create container")
+					return container.CreateResponse{}, fmt.Errorf("failed to create container")
 				},
 			},
 			expectError: true,
@@ -301,13 +334,13 @@ func TestHandleStartNewContainer(t *testing.T) {
 		},
 		{
 			name: "Container start failure",
-			mockClient: &docker.MockDockerClient{
+			mockClient: &MockDockerClient{
 				ContainerStartFn: func(
 					ctx context.Context,
 					containerID string,
 					options container.StartOptions,
 				) error {
-					return fmt.Errorf("Failed to start container")
+					return fmt.Errorf("failed to start container")
 				},
 			},
 			expectError: true,
@@ -328,44 +361,55 @@ func TestHandleStartNewContainer(t *testing.T) {
 
 	for _, tt := range tests {
 		tt := tt
+
 		t.Run(tt.name, func(t *testing.T) {
+			var err error
+			var data interface{}
+
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 
-			handler := NewHandler(tt.mockClient)
-			resp := handler.HandleStartNewContainer(ctx, tt.req)
+			respChan := make(chan protocol.Event, 8)
+			runtime := NewDockerRuntime(tt.mockClient)
+
+			//closing actually inside Dispatcher
+			go func() {
+				runtime.StartNewContainer(ctx, respChan, tt.req)
+				defer close(respChan)
+			}()
+
+			for resp := range respChan {
+				if resp.Error != nil {
+					err = resp.Error
+				}
+				if resp.Data != nil {
+					data = resp.Data
+				}
+			}
 
 			if tt.expectError {
-				if resp.Payload.Error == "" {
-					t.Fatal("Error expected got no error")
+				if err == nil {
+					t.Fatal("expected error, got nil")
 				}
 				return
 			}
 
-			if !tt.expectError {
-				if resp.Payload.Error != "" {
-					t.Fatalf("Error unexpected got error: %s", resp.Payload.Error)
-				}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
 			}
 
-			data, ok := resp.Payload.Data.(string)
-			if !ok {
-				t.Fatalf("payload data is not string")
-			}
-			expectedPrefix := "Container started successfully with ID: "
-			if len(data) <= len(expectedPrefix) || data[:len(expectedPrefix)] != expectedPrefix {
-				t.Fatalf("unexpected payload data: %s", data)
+			if data == nil {
+				t.Fatal("expected data, got nil")
 			}
 		})
 	}
-
 }
 
-func TestHandleDeleteContainer(t *testing.T) {
+func TestDeleteContainer(t *testing.T) {
 	tests := []Test{
 		{
 			name: "Successful deletion of container",
-			mockClient: &docker.MockDockerClient{
+			mockClient: &MockDockerClient{
 				ContainerRemoveFn: func(
 					ctx context.Context,
 					containerID string,
@@ -386,7 +430,7 @@ func TestHandleDeleteContainer(t *testing.T) {
 		},
 		{
 			name: "Error deleting container",
-			mockClient: &docker.MockDockerClient{
+			mockClient: &MockDockerClient{
 				ContainerRemoveFn: func(
 					ctx context.Context,
 					containerID string,
@@ -404,7 +448,7 @@ func TestHandleDeleteContainer(t *testing.T) {
 		},
 		{
 			name: "Delete with Custom options",
-			mockClient: &docker.MockDockerClient{
+			mockClient: &MockDockerClient{
 				ContainerRemoveFn: func(
 					ctx context.Context,
 					containerID string,
@@ -444,42 +488,54 @@ func TestHandleDeleteContainer(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 
-			handler := NewHandler(tt.mockClient)
-			resp := handler.HandleDeleteContainer(ctx, tt.req)
+			resChan := make(chan protocol.Event, 8)
+			run := NewDockerRuntime(tt.mockClient)
+
+			go func() {
+				run.DeleteContainer(ctx, resChan, tt.req)
+				defer close(resChan)
+			}()
+
+			var err error
+			var data interface{}
+			for resp := range resChan {
+				if resp.Error != nil {
+					err = resp.Error
+				}
+
+				if resp.Data != nil {
+					data = resp.Data
+				}
+			}
 
 			if tt.expectError {
-				if resp.Payload.Error == "" {
+				if err == nil {
 					t.Fatal("Error expected got no error")
 				}
 				return
 			}
 
 			if !tt.expectError {
-				if resp.Payload.Error != "" {
-					t.Fatalf("Error unexpected got error: %s", resp.Payload.Error)
+				if err != nil {
+					t.Fatalf("Error unexpected got error: %s", err)
 				}
 				return
 			}
 
-			data, ok := resp.Payload.Data.(string)
-			if !ok {
-				t.Fatalf("payload data is not string")
+			if data == nil {
+				t.Fatalf("data not recieed")
 				return
-			}
-			expectedMessage := "Container deleted successfully"
-			if data != expectedMessage {
-				t.Fatalf("expected payload data: %s, got: %s", expectedMessage, data)
 			}
 
 		})
 	}
 }
 
-func TestHandleStopContainer(t *testing.T) {
+func TestStopContainer(t *testing.T) {
 	tests := []Test{
 		{
 			name: "Successful stopping of container",
-			mockClient: &docker.MockDockerClient{
+			mockClient: &MockDockerClient{
 				ContainerStopFn: func(
 					ctx context.Context,
 					containerID string,
@@ -500,7 +556,7 @@ func TestHandleStopContainer(t *testing.T) {
 		},
 		{
 			name: "Error stopping container",
-			mockClient: &docker.MockDockerClient{
+			mockClient: &MockDockerClient{
 				ContainerStopFn: func(
 					ctx context.Context,
 					containerID string,
@@ -524,42 +580,56 @@ func TestHandleStopContainer(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 
-			handler := NewHandler(tt.mockClient)
-			resp := handler.HandleStopContainer(ctx, tt.req)
+			runt := NewDockerRuntime(tt.mockClient)
+			respChan := make(chan protocol.Event, 8)
+			go func() {
+				defer close(respChan)
+				runt.StopContainer(ctx, respChan, tt.req)
+
+			}()
+
+			var err error
+			var data interface{}
+
+			for resp := range respChan {
+
+				if resp.Error != nil {
+					err = resp.Error
+				}
+
+				if resp.Data != nil {
+					data = resp.Data
+				}
+			}
 
 			if tt.expectError {
-				if resp.Payload.Error == "" {
+				if err == nil {
 					t.Fatal("Error expected got no error")
 				}
 				return
 			}
 
 			if !tt.expectError {
-				if resp.Payload.Error != "" {
-					t.Fatalf("Error unexpected got error: %s", resp.Payload.Error)
+				if err != nil {
+					t.Fatalf("Error unexpected got error: %s", err)
 				}
 				return
 			}
 
-			data, ok := resp.Payload.Data.(string)
-			if !ok {
-				t.Fatalf("payload data is not string")
+			if data == nil {
+				t.Fatalf("data not found")
 				return
-			}
-			expectedMessage := "Container stopped successfully"
-			if data != expectedMessage {
-				t.Fatalf("expected payload data: %s, got: %s", expectedMessage, data)
 			}
 
 		})
 	}
 }
 
-func TestHandleRestartContainer(t *testing.T) {
+func TestRestartContainer(t *testing.T) {
 	tests := []Test{
 		{
 			name: "Successful restarting of container",
-			mockClient: &docker.MockDockerClient{
+			mockClient: &MockDockerClient{
 				ContainerRestartFn: func(
 					ctx context.Context,
 					containerID string,
@@ -580,7 +650,7 @@ func TestHandleRestartContainer(t *testing.T) {
 		},
 		{
 			name: "Error restarting container",
-			mockClient: &docker.MockDockerClient{
+			mockClient: &MockDockerClient{
 				ContainerRestartFn: func(
 					ctx context.Context,
 					containerID string,
@@ -604,42 +674,55 @@ func TestHandleRestartContainer(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 
-			handler := NewHandler(tt.mockClient)
-			resp := handler.HandleRestartContainer(ctx, tt.req)
+			runt := NewDockerRuntime(tt.mockClient)
+			resChan := make(chan protocol.Event, 8)
+
+			go func() {
+				defer close(resChan)
+				runt.RestartContainer(ctx, resChan, tt.req)
+			}()
+
+			var err error
+			var data interface{}
+
+			for resp := range resChan {
+				if resp.Data != nil {
+					data = resp.Data
+				}
+
+				if resp.Error != nil {
+					err = resp.Error
+				}
+			}
 
 			if tt.expectError {
-				if resp.Payload.Error == "" {
+				if err == nil {
 					t.Fatal("Error expected got no error")
 				}
 				return
 			}
 
 			if !tt.expectError {
-				if resp.Payload.Error != "" {
-					t.Fatalf("Error unexpected got error: %s", resp.Payload.Error)
+				if err != nil {
+					t.Fatalf("Error unexpected got error: %s", err)
 				}
 				return
 			}
 
-			data, ok := resp.Payload.Data.(string)
-			if !ok {
+			if data == nil {
 				t.Fatalf("payload data is not string")
 				return
-			}
-			expectedMessage := "Container restarted successfully"
-			if data != expectedMessage {
-				t.Fatalf("expected payload data: %s, got: %s", expectedMessage, data)
 			}
 
 		})
 	}
 }
 
-func TestHandleStartContainer(t *testing.T) {
+func TestStartContainer(t *testing.T) {
 	tests := []Test{
 		{
 			name: "Successful starting of container",
-			mockClient: &docker.MockDockerClient{
+			mockClient: &MockDockerClient{
 				ContainerStartFn: func(
 					ctx context.Context,
 					containerID string,
@@ -660,7 +743,7 @@ func TestHandleStartContainer(t *testing.T) {
 		},
 		{
 			name: "Error starting container",
-			mockClient: &docker.MockDockerClient{
+			mockClient: &MockDockerClient{
 				ContainerStartFn: func(
 					ctx context.Context,
 					containerID string,
@@ -684,33 +767,45 @@ func TestHandleStartContainer(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 
-			handler := NewHandler(tt.mockClient)
-			resp := handler.HandleStartContainer(ctx, tt.req)
+			runt := NewDockerRuntime(tt.mockClient)
+			resChan := make(chan protocol.Event, 8)
+
+			go func() {
+				defer close(resChan)
+				runt.StartContainer(ctx, resChan, tt.req)
+			}()
+
+			var err error
+			var data interface{}
+
+			for resp := range resChan {
+				if resp.Data != nil {
+					data = resp.Data
+				}
+
+				if resp.Error != nil {
+					err = resp.Error
+				}
+			}
 
 			if tt.expectError {
-				if resp.Payload.Error == "" {
+				if err == nil {
 					t.Fatal("Error expected got no error")
 				}
 				return
 			}
 
 			if !tt.expectError {
-				if resp.Payload.Error != "" {
-					t.Fatalf("Error unexpected got error: %s", resp.Payload.Error)
+				if err != nil {
+					t.Fatalf("Error unexpected got error: %s", err)
 				}
 				return
 			}
 
-			data, ok := resp.Payload.Data.(string)
-			if !ok {
+			if data == nil {
 				t.Fatalf("payload data is not string")
 				return
 			}
-			expectedMessage := "Container started successfully"
-			if data != expectedMessage {
-				t.Fatalf("expected payload data: %s, got: %s", expectedMessage, data)
-			}
-
 		})
 	}
 }

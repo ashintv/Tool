@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -196,61 +195,61 @@ func (s *WebsocketService) Unsubscribe(machineID string, username string) error 
 	return fmt.Errorf("subscriber %s not found for machine %s", username, machineID)
 }
 
-func (s *WebsocketService) HandleEvents(ctx context.Context, machineID string, Message lib.WsMessage) {
-	EventType := Message.Payload.Event
-	switch EventType {
-	case lib.UNEXPECTED_STOP:
-		trial, exists := s.RetryHash.Get(machineID)
-		if exists {
-			if trial >= MAX_RETRIES {
-				log.Printf("Max retries reached for machine %s", machineID)
-				return
-			}
-			s.RetryHash.Set(machineID, trial+1, 10*time.Minute)
-		} else {
-			s.RetryHash.Set(machineID, 1, 10*time.Minute)
-		}
+// func (s *WebsocketService) HandleEvents(ctx context.Context, machineID string, Message lib.WsMessage) {
+// 	EventType := Message.Payload.Event
+// 	switch EventType {
+// 	case lib.UNEXPECTED_STOP:
+// 		trial, exists := s.RetryHash.Get(machineID)
+// 		if exists {
+// 			if trial >= MAX_RETRIES {
+// 				log.Printf("Max retries reached for machine %s", machineID)
+// 				return
+// 			}
+// 			s.RetryHash.Set(machineID, trial+1, 10*time.Minute)
+// 		} else {
+// 			s.RetryHash.Set(machineID, 1, 10*time.Minute)
+// 		}
 
-		contID := Message.Payload.ContainerID
-		params := lib.Params{ContainerID: contID}
+// 		contID := Message.Payload.ContainerID
+// 		params := lib.Params{ContainerID: contID}
 
-		ctxTimeout, cancel := context.WithTimeout(ctx, 30*time.Second)
-		defer cancel()
+// 		ctxTimeout, cancel := context.WithTimeout(ctx, 30*time.Second)
+// 		defer cancel()
 
-		resultChan := make(chan lib.PayloadType, 1)
-		errChan := make(chan error, 1)
+// 		resultChan := make(chan lib.PayloadType, 1)
+// 		errChan := make(chan error, 1)
 
-		// async waiter
-		go func() {
-			res, err := s.WaitForResponse(machineID, ctxTimeout)
-			if err != nil {
-				errChan <- err
-				return
-			}
-			resultChan <- res
-		}()
+// 		// async waiter
+// 		go func() {
+// 			res, err := s.WaitForResponse(machineID, ctxTimeout)
+// 			if err != nil {
+// 				errChan <- err
+// 				return
+// 			}
+// 			resultChan <- res
+// 		}()
 
-		// send command
-		cmd := lib.GetCommand(contID, machineID, lib.START_CONTAINER, false, params)
-		if err := s.SendCommandToMachine(cmd); err != nil {
-			log.Printf("SendCommand failed: %v", err)
-			return
-		}
+// 		// send command
+// 		cmd := lib.GetCommand(contID, machineID, lib.START_CONTAINER, false, params)
+// 		if err := s.SendCommandToMachine(cmd); err != nil {
+// 			log.Printf("SendCommand failed: %v", err)
+// 			return
+// 		}
 
-		select {
-		case err := <-errChan:
-			log.Printf("Restart failed on machine %s: %v", machineID, err)
-			return
-		case res := <-resultChan:
-			log.Printf("Container %s restarted on machine %s", contID, machineID)
-			_ = res
-			return
-		case <-ctxTimeout.Done():
-			log.Printf("Restart timed out on machine %s", machineID)
-			return
-		}
+// 		select {
+// 		case err := <-errChan:
+// 			log.Printf("Restart failed on machine %s: %v", machineID, err)
+// 			return
+// 		case res := <-resultChan:
+// 			log.Printf("Container %s restarted on machine %s", contID, machineID)
+// 			_ = res
+// 			return
+// 		case <-ctxTimeout.Done():
+// 			log.Printf("Restart timed out on machine %s", machineID)
+// 			return
+// 		}
 
-	default:
-		log.Printf("Unhandled event type %s from machine %s\n", EventType, machineID)
-	}
-}
+// 	default:
+// 		log.Printf("Unhandled event type %s from machine %s\n", EventType, machineID)
+// 	}
+// }
