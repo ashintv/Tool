@@ -36,6 +36,32 @@ func (d *Dispatcher) RegisterHandler() {
 		HandlerFn: d.DockerRuntime.StartNewContainer,
 		Timeout: 10 * time.Minute,
 	}
+
+	d.handlers[lib.STOP_CONTAINER] = HandlerConfig{
+		HandlerFn: d.DockerRuntime.StopContainer,
+		Timeout: 5 * time.Minute,
+	}
+
+	d.handlers[lib.LIST_CONTAINERS] = HandlerConfig{
+		HandlerFn: d.DockerRuntime.ListContainers,
+		Timeout: 2 * time.Minute,
+	}
+
+	d.handlers[lib.DELETE_CONTAINER] = HandlerConfig{
+		HandlerFn: d.DockerRuntime.DeleteContainer,
+		Timeout: 5 * time.Minute,
+	}
+
+	d.handlers[lib.RESTART_CONTAINER] = HandlerConfig{
+		HandlerFn: d.DockerRuntime.RestartContainer,
+		Timeout: 5 * time.Minute,
+	}
+
+	d.handlers[lib.START_CONTAINER] = HandlerConfig{
+		HandlerFn: d.DockerRuntime.StartContainer,
+		Timeout: 5 * time.Minute,
+	}
+
 }
 
 var handler = map[string]HandlerConfig{

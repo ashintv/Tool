@@ -24,7 +24,7 @@ func main() {
 	wsCli := websocket.NewWSClient(
 		"localhost:8080",
 		"agent",
-		"agent-001",
+		"agent-1",
 		logger,
 		dispatcher.Dispatch,
 	)
