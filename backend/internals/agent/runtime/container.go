@@ -14,6 +14,11 @@ import (
 
 type DockerRuntimeInterface interface {
 	StartNewContainer(ctx context.Context, ResWriter chan<- protocol.Event, req lib.Command)
+	ListContainers(ctx context.Context, ResWriter chan<- protocol.Event, req lib.Command)
+	DeleteContainer(ctx context.Context, ResWriter chan<- protocol.Event, req lib.Command)
+	StopContainer(ctx context.Context, ResWriter chan<- protocol.Event, req lib.Command)
+	RestartContainer(ctx context.Context, ResWriter chan<- protocol.Event, req lib.Command)
+	StartContainer(ctx context.Context, ResWriter chan<- protocol.Event, req lib.Command)
 }
 
 type DockerRuntime struct {
