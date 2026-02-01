@@ -124,7 +124,12 @@ func (R *DockerRuntime) StartNewContainer(ctx context.Context, ResWriter chan<- 
 	}
 
 	protocol.NewEvent(
-		protocol.WithMessage("Container started successfully with ID: "+resp.ID),
+		protocol.WithMessage("Container started successfully with ID: " + resp.ID),
+		protocol.WithData(struct {
+			ID string
+		}{
+			ID: req.ContainerID,
+		}),
 	).Send(ctx, ResWriter)
 
 }
